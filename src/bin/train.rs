@@ -12,7 +12,7 @@ const ITER: u64 = 100;
 
 fn main() -> Result<(), String> {
     let mut nw = FullNetwork::new()
-        .with_size_input_outputs(SIZE, 1, 1, 0.5)
+        .with_size_input_outputs(SIZE, 2, 1, 0.5)
         .with_learning_rate(0.01)
         .with_regularization(REGULARIZATION)
         .build();
@@ -24,28 +24,25 @@ fn main() -> Result<(), String> {
     let mut targets: Vec<Array1<f32>> = Vec::new();
     let mut inputs: Vec<Array1<f32>> = Vec::new();
 
+    let data_len = 600;
+
     let zero = constant(0.0);
     let one = constant(1.0);
-    let two = constant(2.0);
-    let three = constant(3.0);
 
     let sine_100 = sine_with(100, 8.0, 0.0, 0.0);
     let sine_200 = sine_with(200, 8.0, 0.0, 0.0);
 
-    let saw_100 = saw_with(100, 8.0, 0.0, 0.0);
-    let saw_200 = saw_with(200, 8.0, 0.0, 0.0);
+    add_series_data(&mut targets, &[sine_100.as_ref()], 0..data_len);
+    add_series_data(&mut inputs, &[one.as_ref(), zero.as_ref()], 0..data_len);
 
-    add_series_data(&mut targets, &[sine_100.as_ref()], 0..600);
-    add_series_data(&mut inputs, &[zero.as_ref()], 0..600);
+    add_series_data(&mut targets, &[sine_200.as_ref()], 0..data_len);
+    add_series_data(&mut inputs, &[zero.as_ref(), one.as_ref()], 0..data_len);
 
-    add_series_data(&mut targets, &[sine_200.as_ref()], 0..600);
-    add_series_data(&mut inputs, &[one.as_ref()], 0..600);
+    add_series_data(&mut targets, &[sine_100.as_ref()], 0..data_len);
+    add_series_data(&mut inputs, &[one.as_ref(), zero.as_ref()], 0..data_len);
 
-    add_series_data(&mut targets, &[sine_100.as_ref()], 0..600);
-    add_series_data(&mut inputs, &[zero.as_ref()], 0..600);
-
-    add_series_data(&mut targets, &[sine_200.as_ref()], 0..600);
-    add_series_data(&mut inputs, &[one.as_ref()], 0..600);
+    add_series_data(&mut targets, &[sine_200.as_ref()], 0..data_len);
+    add_series_data(&mut inputs, &[zero.as_ref(), one.as_ref()], 0..data_len);
 
     let pb = ProgressBar::new(ITER);
     pb.set_style(
@@ -90,20 +87,24 @@ fn main() -> Result<(), String> {
 
     pb.finish();
 
-    println!("{nw}");
-
     let mut test_inputs: Vec<Array1<f32>> = Vec::new();
 
-    add_series_data(&mut test_inputs, &[zero.as_ref()], 0..1000);
-    add_series_data(&mut test_inputs, &[one.as_ref()], 0..1000);
-    add_series_data(&mut test_inputs, &[zero.as_ref()], 0..1000);
-    add_series_data(&mut test_inputs, &[one.as_ref()], 0..1000);
-    let one_to_zero = linear(1000, 1.0, 0.0);
-    add_series_data(&mut test_inputs, &[one_to_zero.as_ref()], 0..1000);
-    add_series_data(&mut test_inputs, &[zero.as_ref()], 0..1000);
+    add_series_data(&mut test_inputs, &[one.as_ref(), zero.as_ref()], 0..1000);
+    add_series_data(&mut test_inputs, &[zero.as_ref(), one.as_ref()], 0..1000);
+    add_series_data(&mut test_inputs, &[one.as_ref(), zero.as_ref()], 0..1000);
+    let one_to_zero = linear(100, 1.0, 0.0);
+    let zero_to_one = linear(100, 0.0, 1.0);
+    add_series_data(
+        &mut test_inputs,
+        &[one_to_zero.as_ref(), zero_to_one.as_ref()],
+        0..100,
+    );
+    add_series_data(&mut test_inputs, &[zero.as_ref(), one.as_ref()], 0..2000);
+    add_series_data(&mut test_inputs, &[one.as_ref(), one.as_ref()], 0..2000);
 
     let mut wtr = csv::Writer::from_path("out.csv").unwrap();
-    wtr.write_record(&["t", "nw_0", "input"]).unwrap();
+    wtr.write_record(&["t", "nw_0", "input_0", "input_1"])
+        .unwrap();
 
     nw.reset();
 
@@ -116,6 +117,7 @@ fn main() -> Result<(), String> {
             format!("{}", counter).as_str(),
             format!("{}", nw.output[0]).as_str(),
             format!("{}", test_inputs[i][0]).as_str(),
+            format!("{}", test_inputs[i][1]).as_str(),
         ])
         .unwrap();
     }
