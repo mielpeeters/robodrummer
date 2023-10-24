@@ -2,7 +2,14 @@
 name = "neuroner"
 version = "0.1.0"
 edition = "2021"
+default-run = "run"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ndarray = { version = "0.15.6", features = ["blas"] }
+ndarray-rand = "0.14.0"
+ndarray-linalg = { version = "0.16.0", features = ["openblas-system"] }
+csv = "1.2.2"
+rand = "0.8.5"
+indicatif = "0.17"
