@@ -1,4 +1,4 @@
-use std::{fmt::Display, time::Instant};
+use std::fmt::Display;
 
 use ndarray::{Array, Array1, Array2, Axis, Dimension};
 use ndarray_linalg::{Eig, Inverse};

@@ -1,5 +1,5 @@
-// extern crate blas_src;
-// extern crate openblas_src;
+extern crate blas_src;
+extern crate openblas_src;
 
 use indicatif::{ProgressBar, ProgressStyle};
 use ndarray::Array1;
@@ -10,12 +10,12 @@ use neuroner::{
     full_network::FullNetwork,
     midier::play_model,
     python,
-    series::{constant, linear, saw_with, sine_speed_up, sine_with, spike},
+    series::{constant, linear, say, sine_speed_up, sine_with},
     trainutil::add_series_data,
 };
 
 const SIZE: usize = 150;
-const ITER: u64 = 20;
+const ITER: u64 = 200;
 
 fn main() -> Result<(), String> {
     let mut nw = FullNetwork::new()
@@ -33,7 +33,7 @@ fn main() -> Result<(), String> {
 
     let zero = constant(0.0);
     let one = constant(1.0);
-    let zero_to_one = linear(1000, 0.0, 1.0);
+    let zero_to_one = linear(2000, 0.0, 1.0);
 
     let sine_100 = sine_with(100, 8.0, 0.0, 0.0);
     let sine_200 = sine_with(200, 8.0, 0.0, 0.0);
@@ -67,27 +67,28 @@ fn main() -> Result<(), String> {
 
     let mut errors = Vec::new();
 
-    for i in 0..ITER {
+    for _ in 0..ITER {
         let error = nw.train(&inputs, &targets);
         errors.push(error);
         pb.inc(1);
-
-        if i == ITER - 1 {
-            {
-                let mut wtr = csv_start!("out.csv");
-                csv_entry!(wtr <- "t", "nw_0", "target_0", "nw_1", "target_1");
-
-                for i in 0..targets.len() {
-                    nw.forward(&inputs[i]);
-                    let trgt = &targets[i];
-                    csv_entry!(wtr <- i, nw.output[0], trgt[0], nw.output[1], trgt[1]);
-                }
-            }
-            python!("plot.py");
-        }
     }
 
+    say("Training is finished.");
+
     pb.finish();
+
+    // plot target and network output graph
+    {
+        let mut wtr = csv_start!("out.csv");
+        csv_entry!(wtr <- "t", "nw_0", "target_0", "nw_1", "target_1");
+
+        for i in 0..targets.len() {
+            nw.forward(&inputs[i]);
+            let trgt = &targets[i];
+            csv_entry!(wtr <- i, nw.output[0], trgt[0], nw.output[1], trgt[1]);
+        }
+    }
+    python!("plot.py");
 
     // plot error graph
     {
@@ -100,49 +101,33 @@ fn main() -> Result<(), String> {
     }
     python!("plot.py");
 
-    return Ok(());
-
     let mut test_inputs: Vec<Array1<f32>> = Vec::new();
-
-    add_series_data(&mut test_inputs, &[one.as_ref(), zero.as_ref()], 0..1000);
-    add_series_data(&mut test_inputs, &[zero.as_ref(), one.as_ref()], 0..1000);
-    add_series_data(&mut test_inputs, &[one.as_ref(), zero.as_ref()], 0..1000);
     let one_to_zero = linear(300, 1.0, 0.0);
     let zero_to_one = linear(300, 0.0, 1.0);
-    add_series_data(
-        &mut test_inputs,
-        &[one_to_zero.as_ref(), zero_to_one.as_ref()],
-        0..300,
-    );
-    add_series_data(&mut test_inputs, &[zero.as_ref(), one.as_ref()], 0..2000);
-    add_series_data(&mut test_inputs, &[one.as_ref(), one.as_ref()], 0..2000);
+    // let one_to_zero_long = linear(1000, 1.0, 0.0);
+    let zero_to_one_long = linear(1000, 0.0, 1.0);
 
-    let mut wtr = csv::Writer::from_path("out.csv").unwrap();
-    // wtr.write_record(&["t", "nw_0", "nw_1", "input_0", "input_1"])
-    wtr.write_record(&["t", "nw_0", "input_0"]).unwrap();
+    add_data!(test_inputs <- [one, zero, zero]; 1000);
+    add_data!(test_inputs <- [zero, one, zero_to_one_long]; 1000);
+    add_data!(test_inputs <- [one, zero, one]; 1000);
+    add_data!(test_inputs <- [one_to_zero, zero_to_one, one_to_zero]; 300);
+    add_data!(test_inputs <- [zero, one, zero]; 2000);
+    add_data!(test_inputs <- [one, one, zero]; 2000);
 
-    nw.reset_state();
+    {
+        let mut wtr = csv_start!("out.csv");
+        // wtr.write_record(&["t", "nw_0", "nw_1", "input_0", "input_1"])
+        csv_entry!(wtr <- "t", "nw_0", "input_0");
 
-    for i in 0..test_inputs.len() {
-        nw.forward(&test_inputs[i]);
+        nw.reset_state();
 
-        wtr.write_record(&[
-            format!("{}", i).as_str(),
-            format!("{}", nw.output[0]).as_str(),
-            // format!("{}", nw.output[1]).as_str(),
-            format!("{}", test_inputs[i][0]).as_str(),
-            // format!("{}", test_inputs[i][1]).as_str(),
-        ])
-        .unwrap();
+        for i in 0..test_inputs.len() {
+            nw.forward(&test_inputs[i]);
+
+            csv_entry!(wtr <- i, nw.output[0], test_inputs[i][0]);
+        }
     }
-
-    wtr.flush().unwrap();
-    drop(wtr);
-
-    std::process::Command::new("python3")
-        .arg("plot.py")
-        .output()
-        .unwrap();
+    python!("plot.py");
 
     play_model(Box::new(nw));
 

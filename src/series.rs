@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+use std::{f32::consts::PI, process};
 
 macro_rules! serie {
     ($name:ident ($($arg_name: ident: $arg_type: ty),*) $fun: expr) => {
@@ -50,6 +50,26 @@ macro_rules! python {
             .output()
             .unwrap();
     };
+}
+
+#[macro_export]
+macro_rules! miel {
+    ($say: ident; > $($rest: tt)*) => { $say.push_str("right "); miel!($say; $($rest)*); };
+    ($say: ident; >> $($rest: tt)*) => { miel!($say; > > $($rest)*); };
+    ($say: ident; < $($rest: tt)*) => { $say.push_str("left "); miel!($say; $($rest)*); };
+    ($say: ident; << $($rest: tt)*) => { miel!($say; < < $($rest)*); };
+    ($say: ident; : $($rest: tt)*) => { $say.push_str("nothn "); miel!($say; $($rest)*); };
+    ($say: ident; :: $($rest: tt)*) => { miel!($say; : : $($rest)*); };
+    ($say: ident; ) => {};
+}
+
+pub fn say(what_to_say: &str) {
+    process::Command::new("spd-say")
+        .arg("-y")
+        .arg("male5")
+        .arg(what_to_say)
+        .output()
+        .unwrap();
 }
 
 serie!(sine_with(period: i32, size: f32, offset: f32, phase: f32) move |i| {
