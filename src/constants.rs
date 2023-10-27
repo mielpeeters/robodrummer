@@ -1,5 +1,5 @@
-pub const DAMPING: f32 = 0.87;
+pub const DAMPING: f32 = 0.95;
 
-pub const OUTPUT_NEURON_DIRECT_FEEDBACK: bool = false;
+pub const OUTPUT_NEURON_DIRECT_FEEDBACK: bool = true;
 
-pub const REGULARIZATION: f32 = 3.0;
+pub const REGULARIZATION: f32 = 1.0;

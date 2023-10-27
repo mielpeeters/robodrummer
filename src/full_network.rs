@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, time::Instant};
 
 use ndarray::{Array, Array1, Array2, Axis, Dimension};
 use ndarray_linalg::{Eig, Inverse};
@@ -211,9 +211,13 @@ impl FullNetwork {
         self.weights_res_out = weights_res_out;
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset_state(&mut self) {
         self.state = Array1::zeros(self.state.len());
         self.output = Array1::zeros(self.outputs);
+    }
+
+    pub fn adjust_damping(&mut self, amount: f32) {
+        self.damp_coef += amount;
     }
 
     pub fn forward(&mut self, input: &Array1<f32>) {
@@ -222,24 +226,32 @@ impl FullNetwork {
         new_state = new_state + self.weights_out_res.dot(&self.output);
         new_state = new_state + &self.bias_res;
 
-        new_state.iter_mut().for_each(|x| {
-            *x = self.activation.apply(*x);
-        });
+        new_state.mapv_inplace(|x| self.activation.apply(x));
 
         self.state = self.damp_coef * &self.state + (1.0 - self.damp_coef) * &new_state;
 
         self.output = self.weights_res_out.dot(&self.state); // + &self.bias_out;
     }
 
-    pub fn train(&mut self, inputs: &[Array1<f32>], targets: &[Array1<f32>]) {
+    pub fn get_output(&self, output_id: usize) -> f32 {
+        *self.output.get(output_id).unwrap()
+    }
+
+    pub fn train(&mut self, inputs: &[Array1<f32>], targets: &[Array1<f32>]) -> f64 {
         let mut states: Array2<f32> = Array2::zeros((self.state.len(), inputs.len()));
         let mut outputs: Array2<f32> = Array2::zeros((self.outputs, inputs.len()));
         let mut states_vec: Vec<Array1<f32>> = Vec::with_capacity(inputs.len());
+        let mut error: f64 = 0.0;
 
         // calculate all states
-        for input in inputs {
+        // self.reset_state();
+        for (j, input) in inputs.iter().enumerate() {
             self.forward(input);
             states_vec.push(self.state.clone());
+            self.output
+                .iter()
+                .enumerate()
+                .for_each(|(i, output)| error += (targets[j][i] - output).powi(2) as f64)
         }
 
         // create X matrix
@@ -258,6 +270,7 @@ impl FullNetwork {
 
         let mut weights = outputs.dot(&states.t());
 
+        // the most expensive calculation! (almost 40% of training time...)
         let xxt = states.dot(&states.t());
 
         let lambdas = self.regularization * Array2::eye(self.state.len());
@@ -270,6 +283,7 @@ impl FullNetwork {
 
         self.weights_res_out =
             (1.0 - self.learning_rate) * &self.weights_res_out + self.learning_rate * weights;
-        self.reset();
+
+        error
     }
 }
