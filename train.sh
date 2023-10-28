@@ -1,10 +1,6 @@
 #!/bin/bash
 
-# build appliaction
+# build application
 cargo build --release --bin=train;
 
-./target/release/train
-
-# python3 plot.py
-
-# eog plot.png
+~/.target/release/train

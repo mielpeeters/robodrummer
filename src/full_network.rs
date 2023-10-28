@@ -74,7 +74,8 @@ impl Display for FullNetwork {
     }
 }
 
-fn connectivity<D>(arr: &mut ndarray::Array<f32, D>, conn_fract: f64, rng: &mut ThreadRng)
+/// ensure that the ndarray has zero-entries for `(1 - conn_fract)` fraction of entries.
+fn connectivity<D>(arr: &mut Array<f32, D>, conn_fract: f64, rng: &mut ThreadRng)
 where
     D: Dimension,
 {
@@ -85,6 +86,8 @@ where
     });
 }
 
+/// For all non-zero entries of the array, set it to either `either`, or `or`.
+/// `either` is selected with a probability of `fract`.
 fn either_or<D>(arr: &mut Array<f32, D>, either: f32, or: f32, fract: f64, rng: &mut ThreadRng)
 where
     D: Dimension,
@@ -102,12 +105,12 @@ where
 
 impl FullNetworkBuilder {
     pub fn with_size_input_outputs(
-        &mut self,
+        mut self,
         size: usize,
         inputs: usize,
         outputs: usize,
         conn: f64,
-    ) -> &mut Self {
+    ) -> Self {
         self.0.size = size;
         self.0.inputs = inputs;
         self.0.outputs = outputs;
@@ -127,16 +130,17 @@ impl FullNetworkBuilder {
         connectivity(&mut weights_res_out, conn, &mut rng);
 
         if constants::OUTPUT_NEURON_DIRECT_FEEDBACK {
+            // with direct feedback, the out -> res weights are the transpose of the res -> weights
             weights_out_res = weights_res_out.t().to_owned();
         } else {
             connectivity(&mut weights_out_res, conn, &mut rng);
         }
 
-        either_or(&mut weights_out_res, -0.05, 0.05, 0.5, &mut rng);
+        either_or(&mut weights_out_res, -0.1, 0.1, 0.5, &mut rng);
 
         // let bias_res: Array1<f32> = Array::random((size,), StandardNormal);
         let bias_res: Array1<f32> = Array::random((size,), Uniform::new(-0.01, 0.01));
-        let bias_out: Array1<f32> = Array::random((outputs,), Uniform::new(0.0, 0.01));
+        let bias_out: Array1<f32> = Array::random((outputs,), Uniform::new(-0.01, 0.01));
 
         self.0.state = state;
         self.0.output = output;
@@ -154,18 +158,18 @@ impl FullNetworkBuilder {
         self
     }
 
-    pub fn with_learning_rate(&mut self, lr: f32) -> &mut Self {
+    pub fn with_learning_rate(mut self, lr: f32) -> Self {
         self.0.learning_rate = lr;
         self
     }
 
-    pub fn with_regularization(&mut self, lamba: f32) -> &mut Self {
+    pub fn with_regularization(mut self, lamba: f32) -> Self {
         self.0.regularization = lamba;
         self
     }
 
-    pub fn build(&self) -> FullNetwork {
-        self.0.clone()
+    pub fn build(self) -> FullNetwork {
+        self.0
     }
 }
 
@@ -211,9 +215,13 @@ impl FullNetwork {
         self.weights_res_out = weights_res_out;
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset_state(&mut self) {
         self.state = Array1::zeros(self.state.len());
         self.output = Array1::zeros(self.outputs);
+    }
+
+    pub fn adjust_damping(&mut self, amount: f32) {
+        self.damp_coef += amount;
     }
 
     pub fn forward(&mut self, input: &Array1<f32>) {
@@ -222,24 +230,32 @@ impl FullNetwork {
         new_state = new_state + self.weights_out_res.dot(&self.output);
         new_state = new_state + &self.bias_res;
 
-        new_state.iter_mut().for_each(|x| {
-            *x = self.activation.apply(*x);
-        });
+        new_state.mapv_inplace(|x| self.activation.apply(x));
 
         self.state = self.damp_coef * &self.state + (1.0 - self.damp_coef) * &new_state;
 
         self.output = self.weights_res_out.dot(&self.state); // + &self.bias_out;
     }
 
-    pub fn train(&mut self, inputs: &[Array1<f32>], targets: &[Array1<f32>]) {
+    pub fn get_output(&self, output_id: usize) -> f32 {
+        *self.output.get(output_id).unwrap()
+    }
+
+    pub fn train(&mut self, inputs: &[Array1<f32>], targets: &[Array1<f32>]) -> f64 {
         let mut states: Array2<f32> = Array2::zeros((self.state.len(), inputs.len()));
         let mut outputs: Array2<f32> = Array2::zeros((self.outputs, inputs.len()));
         let mut states_vec: Vec<Array1<f32>> = Vec::with_capacity(inputs.len());
+        let mut error: f64 = 0.0;
 
         // calculate all states
-        for input in inputs {
+        // self.reset_state();
+        for (j, input) in inputs.iter().enumerate() {
             self.forward(input);
             states_vec.push(self.state.clone());
+            self.output
+                .iter()
+                .enumerate()
+                .for_each(|(i, output)| error += (targets[j][i] - output).powi(2) as f64)
         }
 
         // create X matrix
@@ -258,6 +274,7 @@ impl FullNetwork {
 
         let mut weights = outputs.dot(&states.t());
 
+        // the most expensive calculation! (almost 40% of training time...)
         let xxt = states.dot(&states.t());
 
         let lambdas = self.regularization * Array2::eye(self.state.len());
@@ -270,6 +287,7 @@ impl FullNetwork {
 
         self.weights_res_out =
             (1.0 - self.learning_rate) * &self.weights_res_out + self.learning_rate * weights;
-        self.reset();
+
+        error
     }
 }
