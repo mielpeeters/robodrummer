@@ -12,9 +12,10 @@ blas-src = { version = "0.9", features = ["openblas"] }
 openblas-src = { version = "0.10", features = ["cblas", "system"] }
 ndarray-rand = "0.14.0"
 ndarray-linalg = { version = "0.16.0", features = ["openblas-system"] }
-csv = "1.2.2"
+csv = "1.3.0"
 rand = "0.8.5"
 indicatif = "0.17"
 midir = "0.9.1"
 text_io = "0.1.12"
 midi-control = "0.2.2"
+make-csv = { version = "0.1.0", path = "/home/mielpeeters/coding/rust/make_csv" }

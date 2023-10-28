@@ -1,12 +1,10 @@
 use std::{thread, time::Duration};
 
+use make_csv::{csv_entry, csv_start, csv_stop, python};
 use midi_control::MidiMessageSend;
 use ndarray::Array1;
 
-use crate::{
-    add_data, csv_entry, csv_start, csv_stop, errors, full_network::FullNetwork, python, series::*,
-    trainutil::add_series_data,
-};
+use crate::{add_data, errors, full_network::FullNetwork, series::*, trainutil::add_series_data};
 
 pub fn create_midi_output_and_connect() -> Result<midir::MidiOutputConnection, errors::NeuronError>
 {
@@ -60,12 +58,10 @@ pub fn play_model(mut model: Box<FullNetwork>) {
 
     let zero = constant(0.0);
     let one = constant(1.0);
-    // let one_to_zero = linear(300, 1.0, 0.0);
-    let zero_to_one = linear(1000 * PERIOD, 0.0, 0.2);
 
-    add_data!( test_inputs <-  [one, zero, zero]; 1000 * PERIOD);
-    add_data!( test_inputs <-  [zero, one, zero]; 1000 * PERIOD);
-    add_data!( test_inputs <-  [one, zero, zero_to_one]; 1000 * PERIOD);
+    add_data!( test_inputs <-  [one, zero]; 1000 * PERIOD);
+    add_data!( test_inputs <-  [zero, one]; 1000 * PERIOD);
+    add_data!( test_inputs <-  [one, zero]; 1000 * PERIOD);
 
     let mut wtr = csv_start!("out.csv");
     csv_entry!(wtr <- "t", "out 0", "out 1");

@@ -1,5 +1,12 @@
+/*!
+  This module implements some useful timeseries to use as input / output data
+  for training the network.
+*/
+
 use std::{f32::consts::PI, process};
 
+/// this macro improves the readability of the definition of all of the
+/// different series
 macro_rules! serie {
     ($name:ident ($($arg_name: ident: $arg_type: ty),*) $fun: expr) => {
         pub fn $name($($arg_name: $arg_type),*) -> Box<dyn Fn(i32) -> f32> {
@@ -7,60 +14,6 @@ macro_rules! serie {
             Box::new($fun)
         }
     };
-}
-
-#[macro_export]
-macro_rules! add_data {
-    ($target:ident <- [$($shape: ident),*]; $amount: expr) => {
-        add_series_data(
-            &mut $target,
-            &[$($shape.as_ref()),*],
-            0..$amount,
-        );
-    };
-}
-
-#[macro_export]
-macro_rules! csv_entry {
-    ($writer: ident <- $($header:expr),*) => {
-        $writer.write_record(&[$(format!("{}", $header).as_str()),*]).expect("ow");
-    };
-}
-
-#[macro_export]
-macro_rules! csv_stop {
-    ($writer: ident) => {
-        $writer.flush().unwrap();
-        drop($writer);
-    };
-}
-
-#[macro_export]
-macro_rules! csv_start {
-    ($filename: expr) => {
-        csv::Writer::from_path($filename).unwrap()
-    };
-}
-
-#[macro_export]
-macro_rules! python {
-    ($filename: expr) => {
-        std::process::Command::new("python3")
-            .arg($filename)
-            .output()
-            .unwrap();
-    };
-}
-
-#[macro_export]
-macro_rules! miel {
-    ($say: ident; > $($rest: tt)*) => { $say.push_str("right "); miel!($say; $($rest)*); };
-    ($say: ident; >> $($rest: tt)*) => { miel!($say; > > $($rest)*); };
-    ($say: ident; < $($rest: tt)*) => { $say.push_str("left "); miel!($say; $($rest)*); };
-    ($say: ident; << $($rest: tt)*) => { miel!($say; < < $($rest)*); };
-    ($say: ident; : $($rest: tt)*) => { $say.push_str("nothn "); miel!($say; $($rest)*); };
-    ($say: ident; :: $($rest: tt)*) => { miel!($say; : : $($rest)*); };
-    ($say: ident; ) => {};
 }
 
 pub fn say(what_to_say: &str) {

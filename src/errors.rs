@@ -1,3 +1,7 @@
+/*!
+  This module defines some errors which are used throughout this crate.
+*/
+
 #![allow(dead_code)]
 
 use std::{error::Error, fmt::Display};

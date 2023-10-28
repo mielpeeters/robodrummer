@@ -2,29 +2,27 @@ extern crate blas_src;
 extern crate openblas_src;
 
 use indicatif::{ProgressBar, ProgressStyle};
+use make_csv::{csv_entry, csv_start, python};
 use ndarray::Array1;
 use neuroner::{
     add_data,
-    constants::REGULARIZATION,
-    csv_entry, csv_start,
     full_network::FullNetwork,
     midier::play_model,
-    python,
-    series::{constant, linear, say, sine_speed_up, sine_with},
+    series::{constant, linear, say, sine_with},
     trainutil::add_series_data,
 };
 
 const SIZE: usize = 150;
-const ITER: u64 = 200;
+const ITER: u64 = 170;
 
 fn main() -> Result<(), String> {
     let mut nw = FullNetwork::new()
-        .with_size_input_outputs(SIZE, 3, 2, 0.4)
+        .with_size_input_outputs(SIZE, 2, 2, 0.4)
         .with_learning_rate(0.01)
-        .with_regularization(REGULARIZATION)
+        .with_damping_coef(0.95)
         .build();
 
-    nw.scale(Some(1.00));
+    nw.scale(None);
 
     let mut targets: Vec<Array1<f32>> = Vec::new();
     let mut inputs: Vec<Array1<f32>> = Vec::new();
@@ -33,28 +31,21 @@ fn main() -> Result<(), String> {
 
     let zero = constant(0.0);
     let one = constant(1.0);
-    let zero_to_one = linear(2000, 0.0, 1.0);
 
     let sine_100 = sine_with(100, 8.0, 0.0, 0.0);
     let sine_200 = sine_with(200, 8.0, 0.0, 0.0);
 
-    let sine_100_speed_up = sine_speed_up(100, 8.0, 0.5, 2000);
-    let sine_200_speed_up = sine_speed_up(200, 8.0, 0.5, 2000);
-
     add_data!(targets <- [sine_100, sine_200]; data_len);
-    add_data!(inputs  <- [one, zero, zero]; data_len);
+    add_data!(inputs  <- [one, zero]; data_len);
 
     add_data!(targets <- [sine_200, sine_100]; data_len);
-    add_data!(inputs  <- [zero, one, zero]; data_len);
+    add_data!(inputs  <- [zero, one]; data_len);
 
     add_data!(targets <- [sine_100, sine_200]; data_len);
-    add_data!(inputs  <- [one, zero, zero]; data_len);
+    add_data!(inputs  <- [one, zero]; data_len);
 
     add_data!(targets <- [sine_200, sine_100]; data_len);
-    add_data!(inputs  <- [zero, one, zero]; data_len);
-
-    add_data!(targets <- [sine_200_speed_up, sine_100_speed_up]; 2000);
-    add_data!(inputs  <- [zero, one, zero_to_one]; 2000);
+    add_data!(inputs  <- [zero, one]; data_len);
 
     let pb = ProgressBar::new(ITER);
     pb.set_style(
@@ -102,17 +93,16 @@ fn main() -> Result<(), String> {
     python!("plot.py");
 
     let mut test_inputs: Vec<Array1<f32>> = Vec::new();
-    let one_to_zero = linear(300, 1.0, 0.0);
-    let zero_to_one = linear(300, 0.0, 1.0);
-    // let one_to_zero_long = linear(1000, 1.0, 0.0);
-    let zero_to_one_long = linear(1000, 0.0, 1.0);
+    let transnt_len = 500;
+    let one_to_zero = linear(transnt_len, 1.0, 0.0);
+    let zero_to_one = linear(transnt_len, 0.0, 1.0);
 
-    add_data!(test_inputs <- [one, zero, zero]; 1000);
-    add_data!(test_inputs <- [zero, one, zero_to_one_long]; 1000);
-    add_data!(test_inputs <- [one, zero, one]; 1000);
-    add_data!(test_inputs <- [one_to_zero, zero_to_one, one_to_zero]; 300);
-    add_data!(test_inputs <- [zero, one, zero]; 2000);
-    add_data!(test_inputs <- [one, one, zero]; 2000);
+    add_data!(test_inputs <- [one, zero]; 1000);
+    add_data!(test_inputs <- [zero, one]; 1000);
+    add_data!(test_inputs <- [one, zero]; 1000);
+    add_data!(test_inputs <- [one_to_zero, zero_to_one]; transnt_len);
+    add_data!(test_inputs <- [zero, one]; 2000);
+    add_data!(test_inputs <- [one, one]; 2000);
 
     {
         let mut wtr = csv_start!("out.csv");
