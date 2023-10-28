@@ -1,23 +1,6 @@
-#[derive(Default, Clone)]
-pub enum Activation {
-    #[default]
-    /// ReLu function (----/)
-    ReLu,
-    /// Sigmoid function (1 / 1 + e(-x))
-    Sigmoid,
-    /// Tangens Hyperbolicus
-    Tanh,
-}
-
-impl Activation {
-    pub fn apply(&self, input: f32) -> f32 {
-        match self {
-            Self::ReLu => relu(input),
-            Self::Sigmoid => sigmoid(input),
-            Self::Tanh => tanh(input),
-        }
-    }
-}
+/*!
+  This module defines and implements the available activation functions.
+*/
 
 pub fn relu(input: f32) -> f32 {
     input.max(0.0)

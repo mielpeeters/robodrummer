@@ -5,10 +5,9 @@ use ndarray_linalg::{Eig, Inverse};
 use ndarray_rand::{rand_distr::StandardNormal, RandomExt};
 use rand::{distributions::Uniform, rngs::ThreadRng, Rng};
 
-use crate::{
-    activation::Activation,
-    constants::{self, DAMPING},
-};
+use crate::{activation, constants};
+
+pub mod data;
 
 #[derive(Clone)]
 pub struct FullNetwork {
@@ -23,11 +22,10 @@ pub struct FullNetwork {
     size: usize,
     inputs: usize,
     outputs: usize,
-    pub activation: Activation,
+    pub activation: fn(f32) -> f32,
     pub damp_coef: f32,
     learning_rate: f32,
     regularization: f32,
-    gradient: Array2<f32>,
 }
 
 pub struct FullNetworkBuilder(FullNetwork);
@@ -41,35 +39,11 @@ impl Display for FullNetwork {
             self.inputs,
             self.outputs
         )?;
-        writeln!(
-            f,
-            "<<------------------------------------------------------->>"
-        )?;
         writeln!(f, "State: \n{}", self.state)?;
-        writeln!(
-            f,
-            "<<------------------------------------------------------->>"
-        )?;
         writeln!(f, "Input weights: \n{}", self.weights_in_res)?;
-        writeln!(
-            f,
-            "<<------------------------------------------------------->>"
-        )?;
         writeln!(f, "Resonant weights: \n{}", self.weights_res_res)?;
-        writeln!(
-            f,
-            "<<------------------------------------------------------->>"
-        )?;
         writeln!(f, "Res bias: \n{}", self.bias_res)?;
-        writeln!(
-            f,
-            "<<------------------------------------------------------->>"
-        )?;
         writeln!(f, "Output weights: \n{}", self.weights_res_out)?;
-        writeln!(
-            f,
-            "<<------------------------------------------------------->>"
-        )?;
         writeln!(f, "Resulting output: \n{}", self.output)
     }
 }
@@ -117,7 +91,6 @@ impl FullNetworkBuilder {
 
         let state = Array1::zeros(size);
         let output = Array1::zeros(outputs);
-        let gradient = Array2::zeros((outputs, size));
 
         let mut weights_in_res: Array2<f32> = Array::random((size, inputs), StandardNormal);
         let mut weights_res_res: Array2<f32> = Array::random((size, size), StandardNormal);
@@ -153,8 +126,11 @@ impl FullNetworkBuilder {
         self.0.bias_res = bias_res;
         self.0.bias_out = bias_out;
 
-        self.0.gradient = gradient;
+        self
+    }
 
+    pub fn with_damping_coef(mut self, lambda: f32) -> Self {
+        self.0.damp_coef = lambda;
         self
     }
 
@@ -187,11 +163,10 @@ impl FullNetwork {
             size: 0,
             inputs: 0,
             outputs: 0,
-            activation: Activation::Tanh,
-            damp_coef: DAMPING,
+            activation: activation::tanh,
+            damp_coef: 0.95,
             learning_rate: 0.1,
-            regularization: 0.5,
-            gradient: Array2::zeros((0, 0)),
+            regularization: 1.0,
         })
     }
 
@@ -199,8 +174,6 @@ impl FullNetwork {
         let (eig, _) = self.weights_res_res.eig().unwrap();
 
         let max_eig = eig[0].norm();
-
-        println!("{max_eig}");
 
         let target = target.unwrap_or(1.0);
 
@@ -230,7 +203,7 @@ impl FullNetwork {
         new_state = new_state + self.weights_out_res.dot(&self.output);
         new_state = new_state + &self.bias_res;
 
-        new_state.mapv_inplace(|x| self.activation.apply(x));
+        new_state.mapv_inplace(|x| (self.activation)(x));
 
         self.state = self.damp_coef * &self.state + (1.0 - self.damp_coef) * &new_state;
 
