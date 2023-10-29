@@ -18,4 +18,4 @@ indicatif = "0.17"
 midir = "0.9.1"
 text_io = "0.1.12"
 midi-control = "0.2.2"
-make-csv = { version = "0.1.0", path = "/home/mielpeeters/coding/rust/make_csv" }
+make-csv = "0.1.0"

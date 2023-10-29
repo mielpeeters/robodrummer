@@ -3,6 +3,7 @@
 */
 use std::ops::Range;
 
+use indicatif::{ProgressBar, ProgressStyle};
 use ndarray::Array1;
 
 pub fn add_series_data(
@@ -14,6 +15,19 @@ pub fn add_series_data(
         let data_element: Vec<f32> = generators.iter().map(|f| f(i)).collect();
         container.push(Array1::from_vec(data_element));
     }
+}
+
+pub fn create_progress_bar(len: u64) -> ProgressBar {
+    let pb = ProgressBar::new(len);
+    pb.set_style(
+        ProgressStyle::with_template(
+            "Training...  {bar:40.green/black}  {pos} / {len}  eta: {eta}",
+        )
+        .unwrap()
+        .progress_chars("━━─"),
+    );
+
+    pb
 }
 
 #[macro_export]
