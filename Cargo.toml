@@ -3,11 +3,12 @@ name = "neuroner"
 version = "0.1.0"
 edition = "2021"
 default-run = "train"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+authors = ["Miel Peeters"]
+description = "A reservoir computing implementation for generating musical feeling."
 
 [dependencies]
-ndarray = { version = "0.15.6", features = ["blas"] }
+midier = { version = "0.1.0", path = "../midier" }
+ndarray = { version = "0.15.6", features = ["blas", "serde"] }
 blas-src = { version = "0.9", features = ["openblas"] }
 openblas-src = { version = "0.10", features = ["cblas", "system"] }
 ndarray-rand = "0.14.0"
@@ -19,3 +20,8 @@ midir = "0.9.1"
 text_io = "0.1.12"
 midi-control = "0.2.2"
 make-csv = "0.1.0"
+bincode = "1.3.3"
+serde = { version = "1.0", features = ["derive"] }
+clap = { version = "4.4.11", features = ["derive"] }
+dirs = "5.0.1"
+zmq = "0.10.0"

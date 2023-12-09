@@ -1,7 +1,7 @@
 pub mod activation;
 pub mod constants;
 mod errors;
-pub mod full_network;
-pub mod midier;
+pub mod midiutils;
+pub mod reservoir;
 pub mod series;
 pub mod trainutil;

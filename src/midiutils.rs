@@ -2,35 +2,10 @@ use std::{thread, time::Duration};
 
 use make_csv::{csv_entry, csv_start, csv_stop, python};
 use midi_control::MidiMessageSend;
+use midier::create_midi_output_and_connect;
 use ndarray::Array1;
 
-use crate::{add_data, errors, full_network::FullNetwork, series::*, trainutil::add_series_data};
-
-pub fn create_midi_output_and_connect() -> Result<midir::MidiOutputConnection, errors::NeuronError>
-{
-    let Ok(output) = midir::MidiOutput::new("ESN_Midi") else {
-        return Err(errors::NeuronError::CantCreateMidiOut);
-    };
-
-    println!("Available Midi ports to connect to:");
-    let ports = output.ports();
-    for (i, port) in ports.iter().enumerate() {
-        println!("{i}:   {}", output.port_name(&port).unwrap());
-    }
-
-    println!("\nSelect one: ");
-
-    let num: usize = text_io::read!();
-    let name = output.port_name(ports.get(num).unwrap()).unwrap();
-
-    let Ok(conn) = output.connect(ports.get(num).unwrap(), "ESN_Midi_conn") else {
-        return Err(errors::NeuronError::CantConnectMidi);
-    };
-
-    println!("Connected to Midi device \x1b[1m{}\x1b[0m!", name);
-
-    Ok(conn)
-}
+use crate::{add_data, reservoir::Reservoir, series::*, trainutil::add_series_data};
 
 pub fn send_beat(conn: &mut midir::MidiOutputConnection, num: u32) {
     let ch = match num {
@@ -43,7 +18,7 @@ pub fn send_beat(conn: &mut midir::MidiOutputConnection, num: u32) {
         .unwrap();
 }
 
-pub fn play_model(mut model: Box<FullNetwork>) {
+pub fn play_model(mut model: Box<Reservoir>) {
     model.reset_state();
 
     let mut midi_out = create_midi_output_and_connect().unwrap();
@@ -67,7 +42,7 @@ pub fn play_model(mut model: Box<FullNetwork>) {
     csv_entry!(wtr <- "t", "out 0", "out 1");
 
     for (idx, i) in test_inputs.iter().enumerate() {
-        model.forward(&i);
+        model.forward(i);
 
         csv_entry!(wtr <- idx, model.output[0], model.output[1]);
 

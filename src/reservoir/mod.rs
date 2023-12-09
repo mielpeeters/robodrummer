@@ -4,13 +4,14 @@ use ndarray::{Array, Array1, Array2, Axis, Dimension};
 use ndarray_linalg::{Eig, Inverse};
 use ndarray_rand::{rand_distr::StandardNormal, RandomExt};
 use rand::{distributions::Uniform, rngs::ThreadRng, Rng};
+use serde::{Deserialize, Serialize};
 
-use crate::{activation, constants};
+use crate::{activation::Activation, constants};
 
 pub mod data;
 
-#[derive(Clone)]
-pub struct FullNetwork {
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Reservoir {
     state: Array1<f32>,
     pub output: Array1<f32>,
     weights_in_res: Array2<f32>,
@@ -20,17 +21,17 @@ pub struct FullNetwork {
     bias_res: Array1<f32>,
     bias_out: Array1<f32>,
     size: usize,
-    inputs: usize,
+    pub inputs: usize,
     outputs: usize,
-    pub activation: fn(f32) -> f32,
+    pub activation: Activation,
     pub damp_coef: f32,
     learning_rate: f32,
     regularization: f32,
 }
 
-pub struct FullNetworkBuilder(FullNetwork);
+pub struct ReservoirBuilder(Reservoir);
 
-impl Display for FullNetwork {
+impl Display for Reservoir {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
@@ -77,7 +78,7 @@ where
     })
 }
 
-impl FullNetworkBuilder {
+impl ReservoirBuilder {
     pub fn with_size_input_outputs(
         mut self,
         size: usize,
@@ -144,14 +145,14 @@ impl FullNetworkBuilder {
         self
     }
 
-    pub fn build(self) -> FullNetwork {
+    pub fn build(self) -> Reservoir {
         self.0
     }
 }
 
-impl FullNetwork {
-    pub fn new() -> FullNetworkBuilder {
-        FullNetworkBuilder(FullNetwork {
+impl Reservoir {
+    pub fn new_builder() -> ReservoirBuilder {
+        ReservoirBuilder(Reservoir {
             state: Array1::zeros(0),
             output: Array1::zeros(0),
             weights_in_res: Array2::zeros((0, 0)),
@@ -163,7 +164,7 @@ impl FullNetwork {
             size: 0,
             inputs: 0,
             outputs: 0,
-            activation: activation::tanh,
+            activation: Activation::Tanh,
             damp_coef: 0.95,
             learning_rate: 0.1,
             regularization: 1.0,
@@ -180,14 +181,6 @@ impl FullNetwork {
         self.weights_res_res = &self.weights_res_res * target / (max_eig);
     }
 
-    pub fn select_output(&mut self, coord: (usize, usize)) {
-        let shape = self.weights_res_out.shape();
-        let mut weights_res_out: Array2<f32> = Array::zeros((shape[0], shape[1]));
-        *weights_res_out.get_mut(coord).unwrap() = 1.0;
-
-        self.weights_res_out = weights_res_out;
-    }
-
     pub fn reset_state(&mut self) {
         self.state = Array1::zeros(self.state.len());
         self.output = Array1::zeros(self.outputs);
@@ -201,20 +194,21 @@ impl FullNetwork {
         let mut new_state = self.weights_res_res.dot(&self.state);
         new_state = new_state + self.weights_in_res.dot(input);
         new_state = new_state + self.weights_out_res.dot(&self.output);
-        new_state = new_state + &self.bias_res;
+        new_state += &self.bias_res;
 
-        new_state.mapv_inplace(|x| (self.activation)(x));
+        new_state.mapv_inplace(|x| self.activation.apply(x));
 
         self.state = self.damp_coef * &self.state + (1.0 - self.damp_coef) * &new_state;
 
         self.output = self.weights_res_out.dot(&self.state); // + &self.bias_out;
+                                                             // self.output.mapv_inplace(|x| (self.activation)(x));
     }
 
     pub fn get_output(&self, output_id: usize) -> f32 {
         *self.output.get(output_id).unwrap()
     }
 
-    pub fn train(&mut self, inputs: &[Array1<f32>], targets: &[Array1<f32>]) -> f64 {
+    pub fn train_step(&mut self, inputs: &[Array1<f32>], targets: &[Array1<f32>]) -> f64 {
         let mut states: Array2<f32> = Array2::zeros((self.state.len(), inputs.len()));
         let mut outputs: Array2<f32> = Array2::zeros((self.outputs, inputs.len()));
         let mut states_vec: Vec<Array1<f32>> = Vec::with_capacity(inputs.len());

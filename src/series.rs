@@ -48,3 +48,11 @@ serie!(sine_speed_up(period: i32, size: f32, amount: f32, time: i32) move |i| {
     let speedup = (1.0 + amount * (i as f32 / time as f32));
     (i as f32 * PI * 2.0 * speedup / period as f32).sin() * size
 });
+
+serie!(impulse_pause(size: f32) move |i| {
+    if i == 0 {
+        size
+    } else {
+        0.0
+    }
+});
