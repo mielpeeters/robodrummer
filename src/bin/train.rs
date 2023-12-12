@@ -14,7 +14,7 @@ use neuroner::{
 use text_io::read;
 
 const SIZE: usize = 30;
-const ITER: u64 = 10;
+const ITER: u64 = 100;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut nw = Reservoir::new_builder()

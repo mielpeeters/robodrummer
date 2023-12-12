@@ -6,8 +6,12 @@ use std::{
 };
 
 use clap::Parser;
+use guier::Gui;
 use ndarray::Array1;
-use neuroner::reservoir::{data::neuroner_dir, Reservoir};
+use neuroner::{
+    oscutil,
+    reservoir::{data::neuroner_dir, Reservoir},
+};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about=None)]
@@ -75,6 +79,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let publisher = context.socket(zmq::PUB)?;
     publisher.bind(&format!("tcp://*:{}", port))?;
 
+    // set up osc output Socket
+    let osc_sock = std::net::UdpSocket::bind("0.0.0.0:30000").unwrap();
+
+    let mut gui = Gui::new("Neuroner");
+    gui.add_row("output", 0.0);
+
     // main loop
     loop {
         let start = Instant::now();
@@ -99,8 +109,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         // show and publish output
         let output = nw.get_output(0);
-        println!("nw output: {}", output);
         publisher.send(output.to_be_bytes().as_slice(), 0)?;
+        oscutil::send_osc_msg("/neuroner", vec![osc::OscType::Float(output)], &osc_sock);
+
+        gui.update_row("output", &output);
+        gui.show();
 
         std::thread::sleep(remaining);
     }
