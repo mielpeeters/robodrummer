@@ -6,29 +6,49 @@ use ndarray_rand::{rand_distr::StandardNormal, RandomExt};
 use rand::{distributions::Uniform, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 
-use crate::{activation::Activation, constants};
+use crate::{activation::Activation, commands::TrainArgs, constants};
 
 pub mod data;
 
+/// A ESN (Echo State Network) reservoir.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Reservoir {
+    /// internal state of the reservoir
     state: Array1<f32>,
+    /// output layer of the reservoir
     pub output: Array1<f32>,
+    /// input weights (input -> reservoir)
     weights_in_res: Array2<f32>,
+    /// resonant weights (reservoir -> reservoir)
     weights_res_res: Array2<f32>,
+    /// output feedback weights (output -> reservoir)
     weights_out_res: Array2<f32>,
+    /// output weights (reservoir -> output)
+    /// these are the to-be-trained weights
     pub weights_res_out: Array2<f32>,
+    /// bias for the reservoir
     bias_res: Array1<f32>,
+    /// bias for the output layer
     bias_out: Array1<f32>,
+    /// size of the reservoir
     size: usize,
+    /// number of inputs
     pub inputs: usize,
+    /// number of outputs
     outputs: usize,
+    /// activation function
     pub activation: Activation,
-    pub damp_coef: f32,
+    /// leak rate of the neurons
+    pub leak_rate: f32,
+    /// learning rate of the network
     learning_rate: f32,
+    /// number of warm-up steps (currently unused)
+    warm_up: usize,
+    /// regularization parameter lambda
     regularization: f32,
 }
 
+/// A builder for the Reservoir struct.
 pub struct ReservoirBuilder(Reservoir);
 
 impl Display for Reservoir {
@@ -49,7 +69,7 @@ impl Display for Reservoir {
     }
 }
 
-/// ensure that the ndarray has zero-entries for `(1 - conn_fract)` fraction of entries.
+/// ensure that the ndarray has zero-entries for approx. `(1 - conn_fract)` fraction of entries.
 fn connectivity<D>(arr: &mut Array<f32, D>, conn_fract: f64, rng: &mut ThreadRng)
 where
     D: Dimension,
@@ -130,8 +150,8 @@ impl ReservoirBuilder {
         self
     }
 
-    pub fn with_damping_coef(mut self, lambda: f32) -> Self {
-        self.0.damp_coef = lambda;
+    pub fn with_leak_rate(mut self, lambda: f32) -> Self {
+        self.0.leak_rate = lambda;
         self
     }
 
@@ -165,10 +185,28 @@ impl Reservoir {
             inputs: 0,
             outputs: 0,
             activation: Activation::Tanh,
-            damp_coef: 0.95,
+            leak_rate: 0.95,
             learning_rate: 0.1,
-            regularization: 1.0,
+            warm_up: 50,
+            regularization: 0.0,
         })
+    }
+
+    pub fn from_args(args: &TrainArgs) -> Reservoir {
+        let mut nw = Reservoir::new_builder()
+            .with_size_input_outputs(args.size, args.inputs, args.outputs, args.connectivity)
+            .with_learning_rate(args.learning_rate)
+            .with_leak_rate(args.leak_rate)
+            .with_regularization(args.regularization)
+            .build();
+
+        nw.scale(Some(args.spectral_radius));
+
+        nw
+    }
+
+    pub fn set_weights_out(&mut self, weights: Array2<f32>) {
+        self.weights_res_out = weights;
     }
 
     pub fn scale(&mut self, target: Option<f32>) {
@@ -187,18 +225,18 @@ impl Reservoir {
     }
 
     pub fn adjust_damping(&mut self, amount: f32) {
-        self.damp_coef += amount;
+        self.leak_rate += amount;
     }
 
     pub fn forward(&mut self, input: &Array1<f32>) {
         let mut new_state = self.weights_res_res.dot(&self.state);
         new_state = new_state + self.weights_in_res.dot(input);
         new_state = new_state + self.weights_out_res.dot(&self.output);
-        new_state += &self.bias_res;
+        // new_state += &self.bias_res;
 
         new_state.mapv_inplace(|x| self.activation.apply(x));
 
-        self.state = self.damp_coef * &self.state + (1.0 - self.damp_coef) * &new_state;
+        self.state = (1.0 - self.leak_rate) * &self.state + self.leak_rate * &new_state;
 
         self.output = self.weights_res_out.dot(&self.state); // + &self.bias_out;
                                                              // self.output.mapv_inplace(|x| (self.activation)(x));
@@ -208,38 +246,85 @@ impl Reservoir {
         *self.output.get(output_id).unwrap()
     }
 
-    pub fn train_step(&mut self, inputs: &[Array1<f32>], targets: &[Array1<f32>]) -> f64 {
-        let mut states: Array2<f32> = Array2::zeros((self.state.len(), inputs.len()));
-        let mut outputs: Array2<f32> = Array2::zeros((self.outputs, inputs.len()));
-        let mut states_vec: Vec<Array1<f32>> = Vec::with_capacity(inputs.len());
+    /// Train the reservoir using the pseudo-inverse method.
+    ///
+    /// # Arguments
+    /// - `inputs` - A slice of input arrays
+    /// - `targets` - A slice of target arrays
+    /// - `target_times` - An optional slice of times at which the targets are to be reached
+    ///
+    /// # Returns
+    /// The squared error of the training step
+    ///
+    /// # Note
+    /// - This method does not reset the state of the reservoir, so the user can decide when to do so
+    ///   themselves.
+    /// - The targets slice can be either the length of the inputs slice, or the length of the target_times Vec.
+    ///   This gives the user the flexibility to specify the target output at specific times only,
+    ///   or to provide the target output at every time step.
+    /// - The returned error is the error the model makes at the moment, thus before the training
+    ///   step
+    pub fn train_step(
+        &mut self,
+        inputs: &[Array1<f32>],
+        targets: &[Array1<f32>],
+        target_times: Option<&Vec<usize>>,
+    ) -> f64 {
+        // if the target times are given, we only train the network at those times
+        // otherwise, we train at all times
+        let train_instants_count = if let Some(times) = target_times {
+            assert!(
+                targets.len() == times.len(),
+                "The number of targets should be the same length as the specified times in target_times."
+                );
+            assert!(
+                times.len() <= inputs.len(),
+                "There cannot be more specified training times than network input values."
+            );
+            times.len()
+        } else {
+            inputs.len()
+        };
+
+        let mut states: Array2<f32> = Array2::zeros((self.state.len(), train_instants_count));
+        let mut target_outputs: Array2<f32> = Array2::zeros((self.outputs, train_instants_count));
+        let mut states_vec: Vec<Array1<f32>> = Vec::with_capacity(train_instants_count);
         let mut error: f64 = 0.0;
 
         // calculate all states
-        // self.reset_state();
+        let mut target_index = 0;
         for (j, input) in inputs.iter().enumerate() {
             self.forward(input);
+
+            // only train at the specified times
+            if let Some(times) = target_times {
+                if !times.contains(&j) {
+                    continue;
+                }
+            }
+
             states_vec.push(self.state.clone());
-            self.output
-                .iter()
-                .enumerate()
-                .for_each(|(i, output)| error += (targets[j][i] - output).powi(2) as f64)
+            self.output.iter().enumerate().for_each(|(i, output)| {
+                error += (targets[target_index][i] - output).powi(2) as f64
+            });
+            target_index += 1;
         }
 
-        // create X matrix
+        // create X matrix (states)
         for (i, mut row) in states.axis_iter_mut(Axis(0)).enumerate() {
             for (j, col) in row.iter_mut().enumerate() {
                 *col = states_vec[j][i];
             }
         }
 
-        // create Y matrix
-        for (i, mut row) in outputs.axis_iter_mut(Axis(0)).enumerate() {
+        // create Y matrix (target outputs)
+        for (i, mut row) in target_outputs.axis_iter_mut(Axis(0)).enumerate() {
             for (j, col) in row.iter_mut().enumerate() {
                 *col = targets[j][i];
             }
         }
 
-        let mut weights = outputs.dot(&states.t());
+        let mut weights = target_outputs.dot(&states.t());
 
         // the most expensive calculation! (almost 40% of training time...)
         let xxt = states.dot(&states.t());

@@ -38,6 +38,18 @@ impl Reservoir {
         Ok(())
     }
 
+    pub fn load_from_name(model_name: &str) -> Result<Self, Box<dyn Error>> {
+        let mut path = neuroner_dir()?;
+
+        path.push(model_name.to_string() + ".bin");
+
+        let bytes = fs::read(path)?;
+
+        let model: Self = bincode::deserialize(bytes.as_slice())?;
+
+        Ok(model)
+    }
+
     pub fn load_from_file(filename: PathBuf) -> Result<Self, Box<dyn Error>> {
         let bytes = fs::read(filename)?;
 

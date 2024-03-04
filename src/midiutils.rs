@@ -26,7 +26,7 @@ pub fn play_model(mut model: Box<Reservoir>) {
     let mut curr = [model.get_output(0), model.get_output(1)];
     // let mut speed = [0.0; 2];
 
-    const PERIOD: i32 = 2;
+    const PERIOD: usize = 2;
     // const TRANS_MILIS: i32 = 50;
 
     let mut test_inputs: Vec<Array1<f32>> = Vec::new();

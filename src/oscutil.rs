@@ -1,5 +1,10 @@
 use osc::{decode, encode};
-use std::net::UdpSocket;
+use std::net::{SocketAddr, UdpSocket};
+
+pub fn create_socket(port: u16) -> UdpSocket {
+    let addr = SocketAddr::from(([0, 0, 0, 0], port));
+    UdpSocket::bind(addr).unwrap()
+}
 
 pub fn send_osc_msg(addr: &str, msg: Vec<osc::OscType>, socket: &UdpSocket) {
     let bytes = encode(addr, msg);
@@ -35,5 +40,5 @@ pub fn rcv_osc_msg(socket: &UdpSocket) -> Vec<(String, Vec<osc::OscType>)> {
         }
     }
 
-    return result;
+    result
 }

@@ -1,4 +1,5 @@
 pub mod activation;
+pub mod commands;
 pub mod constants;
 mod errors;
 pub mod midiutils;

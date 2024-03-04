@@ -3,7 +3,7 @@
   for training the network.
 */
 
-use std::{f32::consts::PI, process};
+use std::f32::consts::PI;
 
 /// this macro improves the readability of the definition of all of the
 /// different series
@@ -14,15 +14,6 @@ macro_rules! serie {
             Box::new($fun)
         }
     };
-}
-
-pub fn say(what_to_say: &str) {
-    process::Command::new("spd-say")
-        .arg("-y")
-        .arg("male5")
-        .arg(what_to_say)
-        .output()
-        .unwrap();
 }
 
 serie!(sine_with(period: i32, size: f32, offset: f32, phase: f32) move |i| {
@@ -51,6 +42,14 @@ serie!(sine_speed_up(period: i32, size: f32, amount: f32, time: i32) move |i| {
 
 serie!(impulse_pause(size: f32) move |i| {
     if i == 0 {
+        size
+    } else {
+        0.0
+    }
+});
+
+serie!(impulse_width_pause(size: f32, width: i32) move |i| {
+    if i < width {
         size
     } else {
         0.0
