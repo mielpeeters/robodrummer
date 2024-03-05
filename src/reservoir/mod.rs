@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use ndarray::{Array, Array1, Array2, Axis, Dimension};
-use ndarray_linalg::{Eig, SVD};
+use ndarray_linalg::{Eig, Inverse, SVD};
 use ndarray_rand::{rand_distr::StandardNormal, RandomExt};
 use rand::{distributions::Uniform, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
@@ -81,12 +81,16 @@ where
     });
 }
 
-fn pseudo_inverse(matrix: &Array2<f64>, regularization: f64) -> Array2<f64> {
-    let (Some(u), sigma, Some(vt)) = matrix.svd(true, true).unwrap() else {
-        panic!("SVD failed");
+fn pseudo_inverse(matrix: &Array2<f64>, regularization: f64) -> Result<Array2<f64>, String> {
+    let Ok(svd_result) = matrix.svd(true, true) else {
+        return Err("SVD failed @ calculation".to_string());
     };
 
-    let mut s = Array2::zeros((matrix.shape()[0], sigma.len()));
+    let (Some(u), sigma, Some(vt)) = svd_result else {
+        return Err("SVD failed @ unpacking into U, Sigma, V".to_string());
+    };
+
+    let mut s = Array2::zeros((matrix.shape()[0], matrix.shape()[1]));
 
     for (i, val) in sigma.iter().enumerate() {
         // if the value is very small, we set it to zero (which may be weird?)
@@ -99,7 +103,7 @@ fn pseudo_inverse(matrix: &Array2<f64>, regularization: f64) -> Array2<f64> {
 
     let pseudo_inv = vt.t().dot(&s.t()).dot(&u.t());
 
-    pseudo_inv
+    Ok(pseudo_inv)
 }
 
 /// For all non-zero entries of the array, set it to either `either`, or `or`.
@@ -353,21 +357,21 @@ impl Reservoir {
         // pseudo-inverse calculation -> doesn't allow for regularization!
         let pseudo_inv = pseudo_inverse(&states, self.regularization);
 
-        let yxt = target_outputs.dot(&pseudo_inv);
+        let new_weights = match pseudo_inv {
+            Ok(pinv) => target_outputs.dot(&pinv),
+            Err(_) => {
+                // SVD failed, use the regular Moore-Penrose pseudo-inverse method
 
-        // let mut yxt = target_outputs.dot(&states.t());
-
-        // // the most expensive calculation! (almost 40% of training time...)
-        // let xxt = states.dot(&states.t());
-
-        // let lambdas = self.regularization * Array2::eye(self.state.len());
-
-        // let xxt_lambda_inv = (xxt + lambdas).inv().unwrap();
-
-        // yxt = yxt.dot(&xxt_lambda_inv);
+                let yxt = target_outputs.dot(&states.t());
+                let xxt = states.dot(&states.t());
+                let lambdas = self.regularization * Array2::eye(self.state.len());
+                let xxt_lambda_inv = (xxt + lambdas).inv().unwrap();
+                yxt.dot(&xxt_lambda_inv)
+            }
+        };
 
         self.weights_res_out =
-            (1.0 - self.learning_rate) * &self.weights_res_out + self.learning_rate * yxt;
+            (1.0 - self.learning_rate) * &self.weights_res_out + self.learning_rate * new_weights;
 
         error
     }
