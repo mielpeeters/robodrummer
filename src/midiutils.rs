@@ -29,7 +29,7 @@ pub fn play_model(mut model: Box<Reservoir>) {
     const PERIOD: usize = 2;
     // const TRANS_MILIS: i32 = 50;
 
-    let mut test_inputs: Vec<Array1<f32>> = Vec::new();
+    let mut test_inputs: Vec<Array1<f64>> = Vec::new();
 
     let zero = constant(0.0);
     let one = constant(1.0);

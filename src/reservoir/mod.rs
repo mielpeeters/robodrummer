@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use ndarray::{Array, Array1, Array2, Axis, Dimension};
-use ndarray_linalg::{Eig, Inverse};
+use ndarray_linalg::{Eig, SVD};
 use ndarray_rand::{rand_distr::StandardNormal, RandomExt};
 use rand::{distributions::Uniform, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
@@ -14,22 +14,22 @@ pub mod data;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Reservoir {
     /// internal state of the reservoir
-    state: Array1<f32>,
+    state: Array1<f64>,
     /// output layer of the reservoir
-    pub output: Array1<f32>,
+    pub output: Array1<f64>,
     /// input weights (input -> reservoir)
-    weights_in_res: Array2<f32>,
+    weights_in_res: Array2<f64>,
     /// resonant weights (reservoir -> reservoir)
-    weights_res_res: Array2<f32>,
+    weights_res_res: Array2<f64>,
     /// output feedback weights (output -> reservoir)
-    weights_out_res: Array2<f32>,
+    weights_out_res: Array2<f64>,
     /// output weights (reservoir -> output)
     /// these are the to-be-trained weights
-    pub weights_res_out: Array2<f32>,
+    pub weights_res_out: Array2<f64>,
     /// bias for the reservoir
-    bias_res: Array1<f32>,
+    bias_res: Array1<f64>,
     /// bias for the output layer
-    bias_out: Array1<f32>,
+    bias_out: Array1<f64>,
     /// size of the reservoir
     size: usize,
     /// number of inputs
@@ -39,13 +39,13 @@ pub struct Reservoir {
     /// activation function
     pub activation: Activation,
     /// leak rate of the neurons
-    pub leak_rate: f32,
+    pub leak_rate: f64,
     /// learning rate of the network
-    learning_rate: f32,
+    learning_rate: f64,
     /// number of warm-up steps (currently unused)
     warm_up: usize,
     /// regularization parameter lambda
-    regularization: f32,
+    regularization: f64,
 }
 
 /// A builder for the Reservoir struct.
@@ -70,7 +70,7 @@ impl Display for Reservoir {
 }
 
 /// ensure that the ndarray has zero-entries for approx. `(1 - conn_fract)` fraction of entries.
-fn connectivity<D>(arr: &mut Array<f32, D>, conn_fract: f64, rng: &mut ThreadRng)
+fn connectivity<D>(arr: &mut Array<f64, D>, conn_fract: f64, rng: &mut ThreadRng)
 where
     D: Dimension,
 {
@@ -81,9 +81,30 @@ where
     });
 }
 
+fn pseudo_inverse(matrix: &Array2<f64>, regularization: f64) -> Array2<f64> {
+    let (Some(u), sigma, Some(vt)) = matrix.svd(true, true).unwrap() else {
+        panic!("SVD failed");
+    };
+
+    let mut s = Array2::zeros((matrix.shape()[0], sigma.len()));
+
+    for (i, val) in sigma.iter().enumerate() {
+        // if the value is very small, we set it to zero (which may be weird?)
+        if *val < 1e-9 {
+            s[[i, i]] = 0.0;
+        } else {
+            s[[i, i]] = 1.0 / (val + regularization);
+        }
+    }
+
+    let pseudo_inv = vt.t().dot(&s.t()).dot(&u.t());
+
+    pseudo_inv
+}
+
 /// For all non-zero entries of the array, set it to either `either`, or `or`.
 /// `either` is selected with a probability of `fract`.
-fn either_or<D>(arr: &mut Array<f32, D>, either: f32, or: f32, fract: f64, rng: &mut ThreadRng)
+fn either_or<D>(arr: &mut Array<f64, D>, either: f64, or: f64, fract: f64, rng: &mut ThreadRng)
 where
     D: Dimension,
 {
@@ -113,10 +134,10 @@ impl ReservoirBuilder {
         let state = Array1::zeros(size);
         let output = Array1::zeros(outputs);
 
-        let mut weights_in_res: Array2<f32> = Array::random((size, inputs), StandardNormal);
-        let mut weights_res_res: Array2<f32> = Array::random((size, size), StandardNormal);
-        let mut weights_res_out: Array2<f32> = Array::random((outputs, size), StandardNormal);
-        let mut weights_out_res: Array2<f32> = Array::random((size, outputs), StandardNormal);
+        let mut weights_in_res: Array2<f64> = Array::random((size, inputs), StandardNormal);
+        let mut weights_res_res: Array2<f64> = Array::random((size, size), StandardNormal);
+        let mut weights_res_out: Array2<f64> = Array::random((outputs, size), StandardNormal);
+        let mut weights_out_res: Array2<f64> = Array::random((size, outputs), StandardNormal);
 
         let mut rng = rand::thread_rng();
         connectivity(&mut weights_res_res, conn, &mut rng);
@@ -124,7 +145,9 @@ impl ReservoirBuilder {
         connectivity(&mut weights_res_out, conn, &mut rng);
 
         if constants::OUTPUT_NEURON_DIRECT_FEEDBACK {
-            // with direct feedback, the out -> res weights are the transpose of the res -> weights
+            // with direct feedback, the out -> res weights are the transpose of the res -> out weights
+            // TODO: play with the value of this constant to see which effect it has on training
+            // efficiency
             weights_out_res = weights_res_out.t().to_owned();
         } else {
             connectivity(&mut weights_out_res, conn, &mut rng);
@@ -132,9 +155,9 @@ impl ReservoirBuilder {
 
         either_or(&mut weights_out_res, -0.1, 0.1, 0.5, &mut rng);
 
-        // let bias_res: Array1<f32> = Array::random((size,), StandardNormal);
-        let bias_res: Array1<f32> = Array::random((size,), Uniform::new(-0.01, 0.01));
-        let bias_out: Array1<f32> = Array::random((outputs,), Uniform::new(-0.01, 0.01));
+        // let bias_res: Array1<f64> = Array::random((size,), StandardNormal);
+        let bias_res: Array1<f64> = Array::random((size,), Uniform::new(-0.01, 0.01));
+        let bias_out: Array1<f64> = Array::random((outputs,), Uniform::new(-0.01, 0.01));
 
         self.0.state = state;
         self.0.output = output;
@@ -150,17 +173,17 @@ impl ReservoirBuilder {
         self
     }
 
-    pub fn with_leak_rate(mut self, lambda: f32) -> Self {
+    pub fn with_leak_rate(mut self, lambda: f64) -> Self {
         self.0.leak_rate = lambda;
         self
     }
 
-    pub fn with_learning_rate(mut self, lr: f32) -> Self {
+    pub fn with_learning_rate(mut self, lr: f64) -> Self {
         self.0.learning_rate = lr;
         self
     }
 
-    pub fn with_regularization(mut self, lamba: f32) -> Self {
+    pub fn with_regularization(mut self, lamba: f64) -> Self {
         self.0.regularization = lamba;
         self
     }
@@ -205,11 +228,11 @@ impl Reservoir {
         nw
     }
 
-    pub fn set_weights_out(&mut self, weights: Array2<f32>) {
+    pub fn set_weights_out(&mut self, weights: Array2<f64>) {
         self.weights_res_out = weights;
     }
 
-    pub fn scale(&mut self, target: Option<f32>) {
+    pub fn scale(&mut self, target: Option<f64>) {
         let (eig, _) = self.weights_res_res.eig().unwrap();
 
         let max_eig = eig[0].norm();
@@ -224,14 +247,16 @@ impl Reservoir {
         self.output = Array1::zeros(self.outputs);
     }
 
-    pub fn adjust_damping(&mut self, amount: f32) {
+    pub fn adjust_damping(&mut self, amount: f64) {
         self.leak_rate += amount;
     }
 
-    pub fn forward(&mut self, input: &Array1<f32>) {
+    pub fn forward(&mut self, input: &Array1<f64>) {
         let mut new_state = self.weights_res_res.dot(&self.state);
         new_state = new_state + self.weights_in_res.dot(input);
+        // NOTE: this does not seem to have any effect on the trained result...
         new_state = new_state + self.weights_out_res.dot(&self.output);
+        //
         // new_state += &self.bias_res;
 
         new_state.mapv_inplace(|x| self.activation.apply(x));
@@ -242,7 +267,7 @@ impl Reservoir {
                                                              // self.output.mapv_inplace(|x| (self.activation)(x));
     }
 
-    pub fn get_output(&self, output_id: usize) -> f32 {
+    pub fn get_output(&self, output_id: usize) -> f64 {
         *self.output.get(output_id).unwrap()
     }
 
@@ -266,8 +291,8 @@ impl Reservoir {
     ///   step
     pub fn train_step(
         &mut self,
-        inputs: &[Array1<f32>],
-        targets: &[Array1<f32>],
+        inputs: &[Array1<f64>],
+        targets: &[Array1<f64>],
         target_times: Option<&Vec<usize>>,
     ) -> f64 {
         // if the target times are given, we only train the network at those times
@@ -286,9 +311,9 @@ impl Reservoir {
             inputs.len()
         };
 
-        let mut states: Array2<f32> = Array2::zeros((self.state.len(), train_instants_count));
-        let mut target_outputs: Array2<f32> = Array2::zeros((self.outputs, train_instants_count));
-        let mut states_vec: Vec<Array1<f32>> = Vec::with_capacity(train_instants_count);
+        let mut states: Array2<f64> = Array2::zeros((self.state.len(), train_instants_count));
+        let mut target_outputs: Array2<f64> = Array2::zeros((self.outputs, train_instants_count));
+        let mut states_vec: Vec<Array1<f64>> = Vec::with_capacity(train_instants_count);
         let mut error: f64 = 0.0;
 
         // calculate all states
@@ -304,9 +329,10 @@ impl Reservoir {
             }
 
             states_vec.push(self.state.clone());
-            self.output.iter().enumerate().for_each(|(i, output)| {
-                error += (targets[target_index][i] - output).powi(2) as f64
-            });
+            self.output
+                .iter()
+                .enumerate()
+                .for_each(|(i, output)| error += (targets[target_index][i] - output).powi(2));
             target_index += 1;
         }
 
@@ -324,21 +350,24 @@ impl Reservoir {
             }
         }
 
-        let mut weights = target_outputs.dot(&states.t());
+        // pseudo-inverse calculation -> doesn't allow for regularization!
+        let pseudo_inv = pseudo_inverse(&states, self.regularization);
 
-        // the most expensive calculation! (almost 40% of training time...)
-        let xxt = states.dot(&states.t());
+        let yxt = target_outputs.dot(&pseudo_inv);
 
-        let lambdas = self.regularization * Array2::eye(self.state.len());
+        // let mut yxt = target_outputs.dot(&states.t());
 
-        let mut tmp = xxt + lambdas;
+        // // the most expensive calculation! (almost 40% of training time...)
+        // let xxt = states.dot(&states.t());
 
-        tmp = tmp.inv().unwrap();
+        // let lambdas = self.regularization * Array2::eye(self.state.len());
 
-        weights = weights.dot(&tmp);
+        // let xxt_lambda_inv = (xxt + lambdas).inv().unwrap();
+
+        // yxt = yxt.dot(&xxt_lambda_inv);
 
         self.weights_res_out =
-            (1.0 - self.learning_rate) * &self.weights_res_out + self.learning_rate * weights;
+            (1.0 - self.learning_rate) * &self.weights_res_out + self.learning_rate * yxt;
 
         error
     }

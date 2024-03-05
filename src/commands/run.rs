@@ -119,7 +119,7 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
         publisher.send(new_output.to_be_bytes().as_slice(), 0)?;
         oscutil::send_osc_msg(
             "/neuroner",
-            vec![osc::OscType::Float(new_output)],
+            vec![osc::OscType::Double(new_output)],
             &osc_sock,
         );
 

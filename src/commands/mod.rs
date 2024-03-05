@@ -56,15 +56,15 @@ pub struct TrainArgs {
 
     /// Training step: learning rate
     #[arg(short, long = "rate", default_value_t = 0.05)]
-    pub learning_rate: f32,
+    pub learning_rate: f64,
 
     /// Neuron leak rate
     #[arg(long = "lr", default_value_t = 0.1)]
-    pub leak_rate: f32,
+    pub leak_rate: f64,
 
     /// Regularization parameter
-    #[arg(short, long = "reg", default_value_t = 1e-0)]
-    pub regularization: f32,
+    #[arg(short, long = "reg", default_value_t = 1e-2)]
+    pub regularization: f64,
 
     /// inputs
     #[arg(short, long, default_value_t = 1)]
@@ -80,13 +80,17 @@ pub struct TrainArgs {
 
     /// spectral radius
     #[arg(long = "sr", default_value_t = 0.97)]
-    pub spectral_radius: f32,
+    pub spectral_radius: f64,
 
     /// The amount of ms between evaluations
     #[arg(short, long, default_value_t = 2.0)]
-    pub timestep: f32,
+    pub timestep: f64,
 
     /// Do not prematurely if the error increases
     #[arg(long = "nostop", default_value_t = false)]
     pub dont_stop_early: bool,
+
+    /// Amount of beat examples to train from
+    #[arg(short, long, default_value_t = 20)]
+    pub beat_len: usize,
 }

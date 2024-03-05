@@ -16,17 +16,17 @@ pub fn say(what_to_say: &str) {
 }
 
 pub fn add_series_data(
-    container: &mut Vec<Array1<f32>>,
-    generators: &[&dyn Fn(i32) -> f32],
+    container: &mut Vec<Array1<f64>>,
+    generators: &[&dyn Fn(i32) -> f64],
     range: Range<usize>,
 ) {
     for i in range {
-        let data_element: Vec<f32> = generators.iter().map(|f| f(i as i32)).collect();
+        let data_element: Vec<f64> = generators.iter().map(|f| f(i as i32)).collect();
         container.push(Array1::from_vec(data_element));
     }
 }
 
-pub fn add_data(container: &mut Vec<Array1<f32>>, data: &[f32]) {
+pub fn add_data(container: &mut Vec<Array1<f64>>, data: &[f64]) {
     container.push(Array1::from_iter(data.iter().cloned()));
 }
 

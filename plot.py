@@ -1,11 +1,23 @@
 import matplotlib.pyplot as plt
 import pandas as pd
-import scipy.fftpack
+# import scipy.fftpack
 # import numpy as np
 
 df = pd.read_csv('out.csv')
 
-df.set_index('t').plot()
+df = df.set_index('t')
+
+plot_columns = [col for col in df.columns if col != "target_0"]
+
+fig, ax = plt.subplots(figsize=(15, 7))
+
+df[plot_columns].plot(ax = ax)
+try:
+    df["target_0"].plot(ax = ax, color="black", marker="o", markersize=2, label="target")
+    plt.legend()
+except:
+    pass
+
 
 # plt.savefig("plot.png")
 plt.show()
