@@ -1,6 +1,8 @@
 use clap::Parser;
-use neuroner::commands::run::run;
-use neuroner::commands::train::train;
+
+use neuroner::commands::gendata;
+use neuroner::commands::run;
+use neuroner::commands::train;
 use neuroner::commands::Arguments;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -11,5 +13,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match args.command {
         neuroner::commands::Command::Train(t) => train(t),
         neuroner::commands::Command::Run(r) => run(r),
+        neuroner::commands::Command::GenerateData(g) => gendata(g),
     }
 }

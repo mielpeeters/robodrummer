@@ -23,6 +23,7 @@ pub fn train(args: super::TrainArgs) -> Result<(), Box<dyn Error>> {
     let mut inputs: Vec<Array1<f64>> = Vec::new();
 
     let beat = series::impulse_width_pause(1.0, 30);
+    let beat_low = series::impulse_width_pause(0.2, 15);
     let zero = series::constant(0.0);
 
     // one beat per 500ms
@@ -134,6 +135,18 @@ pub fn train(args: super::TrainArgs) -> Result<(), Box<dyn Error>> {
     add_data!(test_inputs <- [beat]; data_len);
     add_data!(test_inputs <- [beat]; data_len);
     add_data!(test_inputs <- [beat]; data_len);
+    add_data!(test_inputs <- [zero]; data_len);
+    add_data!(test_inputs <- [beat_low]; data_len);
+    add_data!(test_inputs <- [beat]; data_len);
+    add_data!(test_inputs <- [beat_low]; data_len);
+    add_data!(test_inputs <- [beat]; data_len);
+    add_data!(test_inputs <- [beat_low]; data_len);
+    add_data!(test_inputs <- [beat]; data_len);
+    add_data!(test_inputs <- [beat_low]; data_len);
+    add_data!(test_inputs <- [beat]; data_len);
+    add_data!(test_inputs <- [zero]; data_len);
+    add_data!(test_inputs <- [zero]; data_len);
+    add_data!(test_inputs <- [zero]; data_len);
     add_data!(test_inputs <- [zero]; data_len);
     add_data!(test_inputs <- [zero]; data_len);
     add_data!(test_inputs <- [zero]; data_len);

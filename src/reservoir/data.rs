@@ -1,5 +1,5 @@
 /*!
-  TODO: implement model saving and loading here
+* Data handling for the reservoir: saving and loading models
 */
 
 use std::fs;
@@ -22,6 +22,21 @@ pub fn neuroner_dir() -> Result<PathBuf, Box<dyn Error>> {
     }
 
     Ok(path)
+}
+
+pub fn list_models() -> Result<(), Box<dyn Error>> {
+    // get the data dir for this app
+    let dir = neuroner_dir()?;
+
+    println!("\x1b[1;92mTrained Models:\x1b[0m");
+    let clr = 214;
+    for (i, path) in (fs::read_dir(dir)?).enumerate() {
+        let name = path.unwrap().file_name();
+        let name = name.to_str().unwrap().split('.').collect::<Vec<&str>>()[0];
+        println!("{i:3}: \x1b[38;5;{}m{name}\x1b[0m", clr as usize + i);
+    }
+
+    Ok(())
 }
 
 impl Reservoir {

@@ -1,30 +1,17 @@
 use std::{
     error::Error,
-    fs,
     sync::{Arc, Mutex, RwLock},
     time::{Duration, Instant},
 };
 
 use crate::{
     oscutil,
-    reservoir::{data::neuroner_dir, Reservoir},
+    reservoir::{data::list_models, Reservoir},
 };
 use guier::Gui;
 use ndarray::Array1;
 
-fn list_models() -> Result<(), Box<dyn Error>> {
-    // get the data dir for this app
-    let dir = neuroner_dir()?;
-
-    for (i, path) in (fs::read_dir(dir)?).enumerate() {
-        let name = path.unwrap().file_name();
-        let name = name.to_str().unwrap().split('.').collect::<Vec<&str>>()[0];
-        println!("{i:3}: {name}");
-    }
-
-    Ok(())
-}
-
+/// run the selected model, determined by the parameters in args.
 pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
     // list models if that argument was passed
     if args.list {
@@ -101,7 +88,7 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
 
         let adjusted_timestep = {
             let m = metronome.lock().unwrap();
-            let a = args.timestep as f64 * 2.0 / *m;
+            let a = args.timestep * 2.0 / *m;
 
             Duration::from_millis(a as u64)
         };
