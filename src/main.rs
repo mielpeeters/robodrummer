@@ -1,3 +1,6 @@
+extern crate blas_src;
+extern crate openblas_src;
+
 use clap::Parser;
 
 use neuroner::commands::gendata;

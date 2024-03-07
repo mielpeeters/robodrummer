@@ -6,9 +6,8 @@ mod gendata;
 mod run;
 mod train;
 
-use clap::Args;
-
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
+use serde::{Deserialize, Serialize};
 
 pub use gendata::gendata;
 pub use run::run;
@@ -54,7 +53,7 @@ pub struct RunArgs {
     pub osc_port: u16,
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 pub struct TrainArgs {
     /// The size of the reservoir
     #[arg(short = 'n', long, default_value_t = 100)]
@@ -76,11 +75,11 @@ pub struct TrainArgs {
     #[arg(short, long = "reg", default_value_t = 1e-2)]
     pub regularization: f64,
 
-    /// inputs
+    /// Amount of reservoir inputs
     #[arg(short, long, default_value_t = 1)]
     pub inputs: usize,
 
-    /// outputs
+    /// Amount of reservoir outputs
     #[arg(short, long, default_value_t = 1)]
     pub outputs: usize,
 
@@ -96,23 +95,31 @@ pub struct TrainArgs {
     #[arg(short, long, default_value_t = 2.0)]
     pub timestep: f64,
 
-    /// Do not prematurely if the error increases
+    /// Do not prematurely stop if the error increases
     #[arg(long = "nostop", default_value_t = false)]
     pub dont_stop_early: bool,
 
-    /// Amount of beat examples to train from
-    #[arg(short, long, default_value_t = 20)]
-    pub beat_len: usize,
+    /// The name of the train data
+    #[arg(short, long, default_value = "default")]
+    pub data: String,
+
+    /// List the available data names
+    #[arg(long, default_value_t = false)]
+    pub list_data: bool,
+
+    /// Split between train and test
+    #[arg(long, default_value_t = 0.8)]
+    pub split: f64,
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 pub struct GenerateDataArgs {
     /// The algorithm used to generate rhythmic patterns
     #[command(subcommand)]
     pub algorithm: RhythmAlgorithm,
 
-    /// The output file to write the data to (saved at $XDG_DATA_HOME/neuroner/traindata/)
-    #[arg(short, long, default_value = "data.csv")]
+    /// The output name to write the data to (saved at $XDG_DATA_HOME/neuroner/traindata/{name}/)
+    #[arg(short, long, default_value = "default")]
     pub output: String,
 
     /// The amount of ms between evaluations
@@ -123,22 +130,30 @@ pub struct GenerateDataArgs {
     #[arg(short, long, default_value_t = 120.0)]
     pub bpm: f64,
 
-    /// The variance to apply to the input data
+    /// The variance to apply to the input data (is actually std dev)
     #[arg(short, long, default_value_t = 5.0)]
     pub variance: f64,
 
     /// The amount with which to scale (speed up) the rhythm compared to the base bpm
     #[arg(short, long, default_value_t = 1)]
     pub scale: u8,
+
+    /// The width of the input pulses
+    #[arg(short, long, default_value_t = 20)]
+    pub width: usize,
+
+    /// The amount of seconds of data to generate
+    #[arg(short, long = "dur", default_value_t = 10.0)]
+    pub duration_s: f64,
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand, Debug, Serialize, Deserialize)]
 pub enum RhythmAlgorithm {
     Euclidean(EucledeanArgs),
     NPDAG(NPDAGArgs),
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 pub struct EucledeanArgs {
     /// The amount of pulses in the euclidean rhythm
     #[arg(short, long, default_value_t = 16)]
@@ -149,5 +164,5 @@ pub struct EucledeanArgs {
     pub k: usize,
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Serialize, Deserialize)]
 pub struct NPDAGArgs {}

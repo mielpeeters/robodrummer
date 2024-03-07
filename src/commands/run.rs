@@ -4,10 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{
-    oscutil,
-    reservoir::{data::list_models, Reservoir},
-};
+use crate::{data::list_models, oscutil, reservoir::Reservoir};
 use guier::Gui;
 use ndarray::Array1;
 
@@ -74,7 +71,7 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
         let user_input = *last_input.read().unwrap();
         if last_known_input != user_input {
             // HACK: this parameter is controlled by the training input pulse width...
-            input_steps_remaining = 30;
+            input_steps_remaining = 20;
             last_known_input = user_input;
         }
 
@@ -93,20 +90,12 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
             Duration::from_millis(a as u64)
         };
 
-        // wait the remaining time
-        let passed_time = Instant::now().duration_since(start);
-        if adjusted_timestep < passed_time {
-            continue;
-        }
-
-        let remaining = adjusted_timestep - passed_time;
-
         // show and publish output
         let new_output = nw.get_output(0);
-        publisher.send(new_output.to_be_bytes().as_slice(), 0)?;
+        publisher.send((new_output as f32).to_be_bytes().as_slice(), 0)?;
         oscutil::send_osc_msg(
             "/neuroner",
-            vec![osc::OscType::Double(new_output)],
+            vec![osc::OscType::Float(new_output as f32)],
             &osc_sock,
         );
 
@@ -115,6 +104,17 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
             gui.update_row("output", &output);
             gui.show();
         }
+
+        log::trace!("Adjusted timestep: {:?}", adjusted_timestep);
+
+        // wait the remaining time
+        let passed_time = Instant::now().duration_since(start);
+        if adjusted_timestep < passed_time {
+            continue;
+        }
+
+        let remaining = adjusted_timestep - passed_time;
+        log::trace!("Remaining: {:?}", remaining);
 
         std::thread::sleep(remaining);
     }

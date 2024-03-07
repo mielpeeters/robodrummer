@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, time::Instant};
 
 use ndarray::{Array, Array1, Array2, Axis, Dimension};
 use ndarray_linalg::{Eig, Inverse, SVD};
@@ -256,19 +256,35 @@ impl Reservoir {
     }
 
     pub fn forward(&mut self, input: &Array1<f64>) {
+        let start = Instant::now();
         let mut new_state = self.weights_res_res.dot(&self.state);
+        let resres_time = start.elapsed();
         new_state = new_state + self.weights_in_res.dot(input);
+        let inres_time = start.elapsed() - resres_time;
         // NOTE: this does not seem to have any effect on the trained result...
         new_state = new_state + self.weights_out_res.dot(&self.output);
+        let outres_time = start.elapsed() - inres_time - resres_time;
         //
         // new_state += &self.bias_res;
 
         new_state.mapv_inplace(|x| self.activation.apply(x));
+        let activation_time = start.elapsed() - outres_time - inres_time - resres_time;
 
         self.state = (1.0 - self.leak_rate) * &self.state + self.leak_rate * &new_state;
+        let leak_time = start.elapsed() - activation_time - outres_time - inres_time - resres_time;
 
         self.output = self.weights_res_out.dot(&self.state); // + &self.bias_out;
                                                              // self.output.mapv_inplace(|x| (self.activation)(x));
+        let output_time =
+            start.elapsed() - leak_time - activation_time - outres_time - inres_time - resres_time;
+
+        log::trace!("\x1b[1mForward Timing:\x1b[0m");
+        log::trace!("ResRes: {:?}", resres_time);
+        log::trace!("InRes: {:?}", inres_time);
+        log::trace!("OutRes: {:?}", outres_time);
+        log::trace!("Activation: {:?}", activation_time);
+        log::trace!("Leak: {:?}", leak_time);
+        log::trace!("Output: {:?}", output_time);
     }
 
     pub fn get_output(&self, output_id: usize) -> f64 {
@@ -293,51 +309,32 @@ impl Reservoir {
     ///   or to provide the target output at every time step.
     /// - The returned error is the error the model makes at the moment, thus before the training
     ///   step
-    pub fn train_step(
-        &mut self,
-        inputs: &[Array1<f64>],
-        targets: &[Array1<f64>],
-        target_times: Option<&Vec<usize>>,
-    ) -> f64 {
+    pub fn train_step(&mut self, inputs: &[Array1<f64>], targets: &[Option<Array1<f64>>]) -> f64 {
         // if the target times are given, we only train the network at those times
         // otherwise, we train at all times
-        let train_instants_count = if let Some(times) = target_times {
-            assert!(
-                targets.len() == times.len(),
-                "The number of targets should be the same length as the specified times in target_times."
-                );
-            assert!(
-                times.len() <= inputs.len(),
-                "There cannot be more specified training times than network input values."
-            );
-            times.len()
-        } else {
-            inputs.len()
-        };
-
+        let train_instants_count = targets.iter().filter(|x| x.is_some()).count();
         let mut states: Array2<f64> = Array2::zeros((self.state.len(), train_instants_count));
         let mut target_outputs: Array2<f64> = Array2::zeros((self.outputs, train_instants_count));
         let mut states_vec: Vec<Array1<f64>> = Vec::with_capacity(train_instants_count);
         let mut error: f64 = 0.0;
 
         // calculate all states
-        let mut target_index = 0;
         for (j, input) in inputs.iter().enumerate() {
             self.forward(input);
 
             // only train at the specified times
-            if let Some(times) = target_times {
-                if !times.contains(&j) {
-                    continue;
-                }
-            }
+            let Some(target) = &targets[j] else {
+                continue;
+            };
 
+            // save the state at this target time to the states matrix
             states_vec.push(self.state.clone());
+
+            // save the output at the target time to the target_outputs matrix
             self.output
                 .iter()
                 .enumerate()
-                .for_each(|(i, output)| error += (targets[target_index][i] - output).powi(2));
-            target_index += 1;
+                .for_each(|(i, output)| error += (target[i] - output).powi(2));
         }
 
         // create X matrix (states)
@@ -346,6 +343,9 @@ impl Reservoir {
                 *col = states_vec[j][i];
             }
         }
+
+        // get rid of none values
+        let targets = targets.iter().flatten().collect::<Vec<_>>();
 
         // create Y matrix (target outputs)
         for (i, mut row) in target_outputs.axis_iter_mut(Axis(0)).enumerate() {
