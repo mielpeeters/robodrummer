@@ -2,19 +2,23 @@
 * This module defines the command line interface for the application using clap.
 */
 
+mod completions;
 mod gendata;
 mod run;
 mod train;
 
 use clap::{Args, Parser, Subcommand};
+use clap_complete::Shell;
 use serde::{Deserialize, Serialize};
 
+pub use completions::update_completions;
 pub use gendata::gendata;
 pub use run::run;
 pub use train::train;
 
 #[derive(Parser, Debug)]
 pub struct Arguments {
+    /// The subcommand to run
     #[command(subcommand)]
     pub command: Command,
 }
@@ -24,6 +28,7 @@ pub enum Command {
     Train(TrainArgs),
     Run(RunArgs),
     GenerateData(GenerateDataArgs),
+    Completions(CompletionsArgs),
 }
 
 #[derive(Args, Debug)]
@@ -151,6 +156,7 @@ pub struct GenerateDataArgs {
 pub enum RhythmAlgorithm {
     Euclidean(EucledeanArgs),
     NPDAG(NPDAGArgs),
+    PolyEuclidean(PolyEuclideanArgs),
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
@@ -166,3 +172,33 @@ pub struct EucledeanArgs {
 
 #[derive(Args, Debug, Serialize, Deserialize)]
 pub struct NPDAGArgs {}
+
+#[derive(Args, Debug, Serialize, Deserialize)]
+pub struct PolyEuclideanArgs {
+    /// The amount of pulses in the euclidean rhythm
+    #[arg(short, long, default_value_t = 16)]
+    pub n: usize,
+
+    /// The amount of onsets in the euclidean rhythm
+    #[arg(short, long, default_value_t = 5)]
+    pub k: usize,
+
+    /// The amount of pulses in the euclidean rhythm
+    #[arg(short, long, default_value_t = 16)]
+    pub n_in: usize,
+
+    /// The amount of onsets in the euclidean rhythm
+    #[arg(short, long, default_value_t = 5)]
+    pub k_in: usize,
+
+    /// The scaling between the user and the system
+    #[arg(short, long, default_value_t = 1)]
+    pub scale: u8,
+}
+
+#[derive(Args, Debug)]
+pub struct CompletionsArgs {
+    /// The shell for which to generate completions
+    #[arg(short, long, default_value = "zsh", value_enum)]
+    pub shell: Shell,
+}

@@ -105,7 +105,7 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
             gui.show();
         }
 
-        log::trace!("Adjusted timestep: {:?}", adjusted_timestep);
+        log::debug!("Adjusted timestep: {:?}", adjusted_timestep);
 
         // wait the remaining time
         let passed_time = Instant::now().duration_since(start);
@@ -114,7 +114,7 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
         }
 
         let remaining = adjusted_timestep - passed_time;
-        log::trace!("Remaining: {:?}", remaining);
+        log::debug!("Remaining: {:?}", remaining);
 
         std::thread::sleep(remaining);
     }

@@ -9,7 +9,7 @@ use rand::Rng;
 
 use crate::data::data_dir;
 
-use super::{EucledeanArgs, GenerateDataArgs};
+use super::GenerateDataArgs;
 
 /// A Rhythmic Pattern is just a collection of onsets and silent rests
 ///
@@ -59,17 +59,13 @@ impl Display for RhythmPattern {
     }
 }
 
-fn euclidean(args: &EucledeanArgs) -> RhythmPattern {
-    let mut pattern = RhythmPattern::new(args.n);
-    let real_step = args.n as f64 / args.k as f64;
+fn euclidean(n: usize, k: usize) -> RhythmPattern {
+    let mut pattern = RhythmPattern::new(n);
+    let real_step = n as f64 / k as f64;
 
-    log::info!(
-        "Generating Euclidean rhythm with n = {} and k = {}",
-        args.n,
-        args.k
-    );
+    log::info!("Generating Euclidean rhythm with n = {} and k = {}", n, k);
     log::info!("Real step: {}", real_step);
-    for i in 0..args.k {
+    for i in 0..k {
         let index = (real_step * i as f64).ceil() as usize;
         log::info!("Setting index {} to true", index);
         pattern[index] = true;
@@ -169,6 +165,15 @@ fn pattern_to_csv(pattern: &RhythmPattern, args: &GenerateDataArgs) -> Result<()
     Ok(())
 }
 
+#[allow(unused)]
+fn poly_pattern_to_csv(
+    input_pattern: &RhythmPattern,
+    target_pattern: &RhythmPattern,
+    args: &GenerateDataArgs,
+) -> Result<(), Box<dyn Error>> {
+    Ok(())
+}
+
 /// Generate input-output data to train the reservoir, based on the given arguments
 ///
 /// This function uses research knowledge about rhythmic patterns to generate input-output data
@@ -184,13 +189,14 @@ pub fn gendata(args: GenerateDataArgs) -> Result<(), Box<dyn Error>> {
     //      - NP-DAG
     // - parameters for the sub-algorithm...
 
-    let pattern = match &args.algorithm {
-        super::RhythmAlgorithm::Euclidean(e) => euclidean(e),
+    let target_pattern = match &args.algorithm {
+        super::RhythmAlgorithm::Euclidean(e) => euclidean(e.n, e.k),
         // TODO: NP-DAG algorithm implementation
         super::RhythmAlgorithm::NPDAG(_) => todo!("NP-DAG algorithm not implemented"),
+        super::RhythmAlgorithm::PolyEuclidean(p) => euclidean(p.n, p.k),
     };
 
-    pattern.show();
+    target_pattern.show();
 
-    pattern_to_csv(&pattern, &args)
+    pattern_to_csv(&target_pattern, &args)
 }

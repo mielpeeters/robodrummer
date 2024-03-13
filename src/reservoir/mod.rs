@@ -21,6 +21,8 @@ pub struct Reservoir {
     weights_in_res: Array2<f64>,
     /// resonant weights (reservoir -> reservoir)
     weights_res_res: Array2<f64>,
+    /// Cholesky decomposition of the resonant weights
+    // chol_res_res:
     /// output feedback weights (output -> reservoir)
     weights_out_res: Array2<f64>,
     /// output weights (reservoir -> output)
@@ -82,6 +84,7 @@ where
 }
 
 fn pseudo_inverse(matrix: &Array2<f64>, regularization: f64) -> Result<Array2<f64>, String> {
+    let start = std::time::Instant::now();
     let Ok(svd_result) = matrix.svd(true, true) else {
         return Err("SVD failed @ calculation".to_string());
     };
@@ -102,6 +105,7 @@ fn pseudo_inverse(matrix: &Array2<f64>, regularization: f64) -> Result<Array2<f6
     }
 
     let pseudo_inv = vt.t().dot(&s.t()).dot(&u.t());
+    log::debug!("Pseudo-inverse calculation: {:?}", start.elapsed());
 
     Ok(pseudo_inv)
 }
@@ -375,4 +379,8 @@ impl Reservoir {
 
         error
     }
+
+    //     pub fn set_decomp(&mut self) {
+    //         let decomp = self.weights_res_res.clone().ch
+    //     }
 }
