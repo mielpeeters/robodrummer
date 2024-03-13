@@ -198,7 +198,7 @@ pub struct PolyEuclideanArgs {
 
 #[derive(Args, Debug)]
 pub struct CompletionsArgs {
-    /// The shell for which to generate completions
+    /// The shell for which to generate completions (only zsh works)
     #[arg(short, long, default_value = "zsh", value_enum)]
     pub shell: Shell,
 }
