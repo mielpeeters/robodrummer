@@ -129,6 +129,7 @@ pub fn train(args: super::TrainArgs) -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
+    // nw.generate_sparse();
     nw.reset_state();
     nw.save(&answer)?;
     let meta_path = models_dir()?.join(format!("{}.toml", answer));

@@ -23,6 +23,9 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
     // open the selected network
     let mut nw = Reservoir::load_from_name(&model)?;
 
+    // generate the sparse representation for efficient multiplication
+    nw.generate_sparse();
+
     // set up midi input connection
     let last_input = Arc::new(RwLock::new(0));
     let mut last_known_input: u64 = 0;

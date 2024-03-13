@@ -5,6 +5,7 @@ use ndarray_linalg::{Eig, Inverse, SVD};
 use ndarray_rand::{rand_distr::StandardNormal, RandomExt};
 use rand::{distributions::Uniform, rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
+use sprs::prod::mul_acc_mat_vec_csr;
 
 use crate::{activation::Activation, commands::TrainArgs, constants};
 
@@ -21,6 +22,8 @@ pub struct Reservoir {
     weights_in_res: Array2<f64>,
     /// resonant weights (reservoir -> reservoir)
     weights_res_res: Array2<f64>,
+    /// sparse matrix representation (res -> res)
+    weights_rr_sparse: Option<sprs::CsMat<f64>>,
     /// Cholesky decomposition of the resonant weights
     // chol_res_res:
     /// output feedback weights (output -> reservoir)
@@ -220,6 +223,7 @@ impl Reservoir {
             learning_rate: 0.1,
             warm_up: 50,
             regularization: 0.0,
+            weights_rr_sparse: None,
         })
     }
 
@@ -260,8 +264,22 @@ impl Reservoir {
     }
 
     pub fn forward(&mut self, input: &Array1<f64>) {
+        // make sure the sparse representation is available
+        // self.generate_sparse();
+
         let start = Instant::now();
-        let mut new_state = self.weights_res_res.dot(&self.state);
+        // This is the most expensive step.
+        // If the sparse matrix is available, use that one.
+        let mut new_state = match &self.weights_rr_sparse {
+            Some(sparse) => {
+                let mut res = Array::<f64, _>::zeros(self.state.len());
+                log::trace!("Using sparse matrix multiplication!!");
+                mul_acc_mat_vec_csr(sparse.view(), &self.state, res.view_mut());
+                res
+            }
+            None => self.weights_res_res.dot(&self.state),
+        };
+
         let resres_time = start.elapsed();
         new_state = new_state + self.weights_in_res.dot(input);
         let inres_time = start.elapsed() - resres_time;
@@ -378,6 +396,16 @@ impl Reservoir {
             (1.0 - self.learning_rate) * &self.weights_res_out + self.learning_rate * new_weights;
 
         error
+    }
+
+    /// Set the sparse representation if it doesn't already exist
+    pub fn generate_sparse(&mut self) {
+        if self.weights_rr_sparse.is_some() {
+            return;
+        }
+
+        let result = sprs::CsMat::csr_from_dense(self.weights_res_res.view(), -1.0);
+        self.weights_rr_sparse = Some(result);
     }
 
     //     pub fn set_decomp(&mut self) {
