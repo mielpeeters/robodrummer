@@ -58,7 +58,7 @@ pub struct RunArgs {
     pub osc_port: u16,
 }
 
-#[derive(Args, Debug, Serialize, Deserialize)]
+#[derive(Args, Debug, Serialize, Deserialize, Default)]
 pub struct TrainArgs {
     /// The size of the reservoir
     #[arg(short = 'n', long, default_value_t = 100)]
@@ -115,6 +115,10 @@ pub struct TrainArgs {
     /// Split between train and test
     #[arg(long, default_value_t = 0.8)]
     pub split: f64,
+
+    /// Use the grid structure
+    #[arg(long, default_value_t = false)]
+    pub grid: bool,
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]

@@ -6,7 +6,7 @@ use crate::{
     trainutil::create_progress_bar,
 };
 use make_csv::{csv_entry, csv_start, python};
-use ndarray::Array2;
+use ndarray::{Array1, Array2};
 use text_io::read;
 
 pub fn train(args: super::TrainArgs) -> Result<(), Box<dyn Error>> {
@@ -107,6 +107,7 @@ pub fn train(args: super::TrainArgs) -> Result<(), Box<dyn Error>> {
     }
     python!("plot.py");
 
+    // plot test graph
     {
         let mut wtr = csv_start!("out.csv");
         csv_entry!(wtr <- "t", "nw_0", "input_0");
@@ -119,6 +120,13 @@ pub fn train(args: super::TrainArgs) -> Result<(), Box<dyn Error>> {
 
             csv_entry!(wtr <- i, nw.output[0], input[0]);
             // csv_entry!(wtr <- i, nw.output[0], test_inputs[i][0]);
+        }
+
+        // also add some zeros to see the steady state behaviour
+        for i in 0..1000 {
+            let input: Array1<f64> = Array1::zeros(args.inputs);
+            nw.forward(&input);
+            csv_entry!(wtr <- i + test_inputs.len(), nw.output[0], input[0]);
         }
     }
     python!("plot.py");

@@ -1,9 +1,10 @@
 use std::{fmt::Display, time::Instant};
 
-use ndarray::{Array, Array1, Array2, Axis, Dimension};
+use ndarray::{Array, Array1, Array2, Axis, Dimension, Ix2};
 use ndarray_linalg::{Eig, Inverse, SVD};
 use ndarray_rand::{rand_distr::StandardNormal, RandomExt};
 use rand::{distributions::Uniform, rngs::ThreadRng, Rng};
+use rand_distr::num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use sprs::prod::mul_acc_mat_vec_csr;
 
@@ -115,23 +116,50 @@ fn pseudo_inverse(matrix: &Array2<f64>, regularization: f64) -> Result<Array2<f6
 
 /// For all non-zero entries of the array, set it to either `either`, or `or`.
 /// `either` is selected with a probability of `fract`.
-fn either_or<D>(arr: &mut Array<f64, D>, either: f64, or: f64, fract: f64, rng: &mut ThreadRng)
+fn either_or<T, D>(arr: &mut Array<T, D>, either: T, or: T, fract: f64, rng: &mut ThreadRng)
 where
     D: Dimension,
+    T: std::cmp::PartialEq + Zero + Clone,
 {
     arr.iter_mut().for_each(|x| {
-        if *x != 0.0 {
+        if *x != T::zero() {
             if rng.gen_bool(fract) {
-                *x = either;
+                *x = either.clone();
             } else {
-                *x = or;
+                *x = or.clone();
             }
         }
     })
 }
 
+/// keep only those diagonals that are provided in the `diagonals` slice
+/// numbering of diagonals: 0 is the main diagonal, 1 is the first diagonal below it, etc.
+/// i.e. element (i, j) is on the k-th diagonal if i - j == k
+fn mask_n_diagonals<T>(a: &mut Array<T, Ix2>, diags: &[i32])
+where
+    T: Zero,
+{
+    a.indexed_iter_mut().for_each(|(d, x)| {
+        if !diags.contains(&(d.0 as i32 - d.1 as i32)) {
+            *x = T::zero();
+        }
+    });
+}
+
+#[allow(unused)]
+fn mask_first_n_rows<T>(a: &mut Array2<T>, n: usize)
+where
+    T: Zero,
+{
+    a.indexed_iter_mut().for_each(|(d, x)| {
+        if d.0 > n {
+            *x = T::zero();
+        }
+    });
+}
+
 impl ReservoirBuilder {
-    pub fn with_size_input_outputs(
+    pub fn from_size_input_outputs(
         mut self,
         size: usize,
         inputs: usize,
@@ -164,7 +192,7 @@ impl ReservoirBuilder {
             connectivity(&mut weights_out_res, conn, &mut rng);
         }
 
-        either_or(&mut weights_out_res, -0.1, 0.1, 0.5, &mut rng);
+        // either_or(&mut weights_out_res, -0.1, 0.1, 0.5, &mut rng);
 
         // let bias_res: Array1<f64> = Array::random((size,), StandardNormal);
         let bias_res: Array1<f64> = Array::random((size,), Uniform::new(-0.01, 0.01));
@@ -184,17 +212,38 @@ impl ReservoirBuilder {
         self
     }
 
-    pub fn with_leak_rate(mut self, lambda: f64) -> Self {
+    /// Create a reservoir with a grid structure.
+    ///
+    /// The size is the square root of the amount of neurons (the length of one side of the grid)
+    pub fn from_grid(mut self, size: usize, inputs: usize, outputs: usize) -> Self {
+        // create the default reservoir
+        self = self.from_size_input_outputs(size * size, inputs, outputs, 1.0);
+
+        // set the output connectivity
+        let mut rng = rand::thread_rng();
+        connectivity(&mut self.0.weights_res_out, 0.2, &mut rng);
+
+        // set the input to the first row of the reservoir
+        // mask_first_n_rows(&mut self.0.weights_in_res, size);
+
+        let size = size as i32;
+        // use the EuESN P neuron reservoir structure (grid connections ltr, rtl, ttb, btt)
+        mask_n_diagonals(&mut self.0.weights_res_res, &[0, 1, -1, size, -size]);
+
+        self
+    }
+
+    pub fn leak_rate(mut self, lambda: f64) -> Self {
         self.0.leak_rate = lambda;
         self
     }
 
-    pub fn with_learning_rate(mut self, lr: f64) -> Self {
+    pub fn learning_rate(mut self, lr: f64) -> Self {
         self.0.learning_rate = lr;
         self
     }
 
-    pub fn with_regularization(mut self, lamba: f64) -> Self {
+    pub fn regularization(mut self, lamba: f64) -> Self {
         self.0.regularization = lamba;
         self
     }
@@ -228,11 +277,21 @@ impl Reservoir {
     }
 
     pub fn from_args(args: &TrainArgs) -> Reservoir {
-        let mut nw = Reservoir::new_builder()
-            .with_size_input_outputs(args.size, args.inputs, args.outputs, args.connectivity)
-            .with_learning_rate(args.learning_rate)
-            .with_leak_rate(args.leak_rate)
-            .with_regularization(args.regularization)
+        let nw = if args.grid {
+            Reservoir::new_builder().from_grid(args.size, args.inputs, args.outputs)
+        } else {
+            Reservoir::new_builder().from_size_input_outputs(
+                args.size,
+                args.inputs,
+                args.outputs,
+                args.connectivity,
+            )
+        };
+
+        let mut nw = nw
+            .learning_rate(args.learning_rate)
+            .leak_rate(args.leak_rate)
+            .regularization(args.regularization)
             .build();
 
         nw.scale(Some(args.spectral_radius));
