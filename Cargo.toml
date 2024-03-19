@@ -7,7 +7,7 @@ description = "A reservoir computing implementation for generating musical feeli
 
 [dependencies]
 midier = { version = "0.1.0", path = "../midier" }
-ndarray = { version = "0.15.6", features = ["blas", "serde", "rayon"] }
+ndarray = { version = "0.15.6", features = ["blas", "serde"] }
 blas-src = { version = "0.10", default-features = false, features = [
     "openblas",
 ] }
