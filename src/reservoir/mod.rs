@@ -1,7 +1,8 @@
-use std::{fmt::Display, time::Instant};
+use std::{fmt::Display, fs, path::PathBuf, time::Instant};
 
-use ndarray::{Array, Array1, Array2, Axis, Dimension, Ix2};
+use ndarray::{s, Array, Array1, Array2, Axis, Dimension, Ix2};
 use ndarray_linalg::{Eig, Inverse, SVD};
+use ndarray_npy::ReadNpyExt;
 use ndarray_rand::{rand_distr::StandardNormal, RandomExt};
 use rand::{distributions::Uniform, rngs::ThreadRng, Rng};
 use rand_distr::num_traits::Zero;
@@ -9,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use sprs::prod::mul_acc_mat_vec_csr;
 
 use crate::{activation::Activation, commands::TrainArgs, constants};
+
+use self::data::NpyMetaData;
 
 pub mod data;
 
@@ -38,6 +41,8 @@ pub struct Reservoir {
     bias_out: Array1<f64>,
     /// size of the reservoir
     size: usize,
+    /// The number of neurons that are visible to the output (potentially)
+    visible_count: usize,
     /// number of inputs
     pub inputs: usize,
     /// number of outputs
@@ -116,6 +121,7 @@ fn pseudo_inverse(matrix: &Array2<f64>, regularization: f64) -> Result<Array2<f6
 
 /// For all non-zero entries of the array, set it to either `either`, or `or`.
 /// `either` is selected with a probability of `fract`.
+#[allow(unused)]
 fn either_or<T, D>(arr: &mut Array<T, D>, either: T, or: T, fract: f64, rng: &mut ThreadRng)
 where
     D: Dimension,
@@ -169,6 +175,7 @@ impl ReservoirBuilder {
         self.0.size = size;
         self.0.inputs = inputs;
         self.0.outputs = outputs;
+        self.0.visible_count = size;
 
         let state = Array1::zeros(size);
         let output = Array1::zeros(outputs);
@@ -233,6 +240,51 @@ impl ReservoirBuilder {
         self
     }
 
+    pub fn from_npy(mut self, metadatapath: PathBuf) -> Self {
+        let metadata =
+            toml::from_str::<NpyMetaData>(&fs::read_to_string(metadatapath).unwrap()).unwrap();
+
+        // initialize parameters
+        self.0.size = metadata.n;
+        self.0.inputs = 1;
+        self.0.outputs = 1;
+
+        // initialize state and output neurons
+        self.0.state = Array1::zeros(self.0.size);
+        self.0.output = Array1::zeros(self.0.outputs);
+
+        // initialize resonant weights
+        let res_res_reader = fs::File::open(metadata.res_res_path).unwrap();
+        let res = Array2::<f32>::read_npy(res_res_reader).unwrap();
+        self.0.weights_res_res = res.mapv(|x| x as f64);
+
+        // initialize input weights
+        let in_res_reader = fs::File::open(metadata.in_res_path).unwrap();
+        let res = Array2::<f32>::read_npy(in_res_reader).unwrap();
+        self.0.weights_in_res = res.mapv(|x| x as f64);
+
+        // initialize reservoir bias weights
+        let bias_reader = fs::File::open(metadata.bias_path).unwrap();
+        let bias = Array1::<f32>::read_npy(bias_reader).unwrap();
+        self.0.bias_res = bias.mapv(|x| x as f64);
+
+        // initialize feedback weights (no feedback, thus zero)
+        self.0.weights_out_res = Array2::zeros((self.0.size, self.0.outputs));
+
+        // do not use output bias
+        self.0.bias_out = Array1::zeros(self.0.outputs);
+
+        // initialize output weights to the pre-trained values
+        let out_res_reader = fs::File::open(metadata.out_path).unwrap();
+        let res = Array2::<f32>::read_npy(out_res_reader).unwrap();
+        self.0.weights_res_out = res.mapv(|x| x as f64);
+
+        // set visible parameter to ensure that o neurons won't be trained
+        self.0.visible_count = metadata.n / 3;
+
+        self.leak_rate(metadata.leak_rate)
+    }
+
     pub fn leak_rate(mut self, lambda: f64) -> Self {
         self.0.leak_rate = lambda;
         self
@@ -265,6 +317,7 @@ impl Reservoir {
             bias_res: Array1::zeros(0),
             bias_out: Array1::zeros(0),
             size: 0,
+            visible_count: 0,
             inputs: 0,
             outputs: 0,
             activation: Activation::Tanh,
@@ -279,6 +332,9 @@ impl Reservoir {
     pub fn from_args(args: &TrainArgs) -> Reservoir {
         let nw = if args.grid {
             Reservoir::new_builder().from_grid(args.size, args.inputs, args.outputs)
+            // .leak_rate(0.001)
+        } else if let Some(npy) = &args.npy {
+            Reservoir::new_builder().from_npy(npy.into())
         } else {
             Reservoir::new_builder().from_size_input_outputs(
                 args.size,
@@ -294,7 +350,9 @@ impl Reservoir {
             .regularization(args.regularization)
             .build();
 
-        nw.scale(Some(args.spectral_radius));
+        if args.npy.is_none() {
+            nw.scale(Some(args.spectral_radius));
+        }
 
         nw
     }
@@ -324,10 +382,10 @@ impl Reservoir {
 
     pub fn forward(&mut self, input: &Array1<f64>) {
         // make sure the sparse representation is available
-        // self.generate_sparse();
+        self.generate_sparse();
 
+        // 1: Reservoir -> Reservoir
         let start = Instant::now();
-        // This is the most expensive step.
         // If the sparse matrix is available, use that one.
         let mut new_state = match &self.weights_rr_sparse {
             Some(sparse) => {
@@ -338,34 +396,18 @@ impl Reservoir {
             }
             None => self.weights_res_res.dot(&self.state),
         };
-
         let resres_time = start.elapsed();
         new_state = new_state + self.weights_in_res.dot(input);
-        let inres_time = start.elapsed() - resres_time;
-        // NOTE: this does not seem to have any effect on the trained result...
-        new_state = new_state + self.weights_out_res.dot(&self.output);
-        let outres_time = start.elapsed() - inres_time - resres_time;
-        //
-        // new_state += &self.bias_res;
-
         new_state.mapv_inplace(|x| self.activation.apply(x));
-        let activation_time = start.elapsed() - outres_time - inres_time - resres_time;
-
         self.state = (1.0 - self.leak_rate) * &self.state + self.leak_rate * &new_state;
-        let leak_time = start.elapsed() - activation_time - outres_time - inres_time - resres_time;
 
-        self.output = self.weights_res_out.dot(&self.state); // + &self.bias_out;
-                                                             // self.output.mapv_inplace(|x| (self.activation)(x));
-        let output_time =
-            start.elapsed() - leak_time - activation_time - outres_time - inres_time - resres_time;
+        // 2: Reservoir -> Output
+        self.output = self
+            .weights_res_out
+            .dot(&self.state.slice(s![..self.visible_count])); // + &self.bias_out;
 
         log::trace!("\x1b[1mForward Timing:\x1b[0m");
         log::trace!("ResRes: {:?}", resres_time);
-        log::trace!("InRes: {:?}", inres_time);
-        log::trace!("OutRes: {:?}", outres_time);
-        log::trace!("Activation: {:?}", activation_time);
-        log::trace!("Leak: {:?}", leak_time);
-        log::trace!("Output: {:?}", output_time);
     }
 
     pub fn get_output(&self, output_id: usize) -> f64 {
@@ -394,46 +436,54 @@ impl Reservoir {
         // if the target times are given, we only train the network at those times
         // otherwise, we train at all times
         let train_instants_count = targets.iter().filter(|x| x.is_some()).count();
-        let mut states: Array2<f64> = Array2::zeros((self.state.len(), train_instants_count));
+        let mut states: Array2<f64> = Array2::zeros((self.visible_count, train_instants_count));
         let mut target_outputs: Array2<f64> = Array2::zeros((self.outputs, train_instants_count));
-        let mut states_vec: Vec<Array1<f64>> = Vec::with_capacity(train_instants_count);
         let mut error: f64 = 0.0;
+
+        let mut column_idx = 0;
 
         // calculate all states
         for (j, input) in inputs.iter().enumerate() {
             self.forward(input);
 
-            // only train at the specified times
+            // only train the specified times
             let Some(target) = &targets[j] else {
                 continue;
             };
 
             // save the state at this target time to the states matrix
-            states_vec.push(self.state.clone());
+            let slice = self.state.slice(s![..self.visible_count]);
+
+            // this slice will become a column in the states matrix
+            assert!(slice.len() == states.shape()[0]);
+            states
+                .column_mut(column_idx)
+                .iter_mut()
+                .zip(slice.iter())
+                .for_each(|(a, b)| *a = *b);
 
             // save the output at the target time to the target_outputs matrix
             self.output
                 .iter()
                 .enumerate()
                 .for_each(|(i, output)| error += (target[i] - output).powi(2));
-        }
 
-        // create X matrix (states)
-        for (i, mut row) in states.axis_iter_mut(Axis(0)).enumerate() {
-            for (j, col) in row.iter_mut().enumerate() {
-                *col = states_vec[j][i];
-            }
+            column_idx += 1;
         }
 
         // get rid of none values
         let targets = targets.iter().flatten().collect::<Vec<_>>();
 
-        // create Y matrix (target outputs)
-        for (i, mut row) in target_outputs.axis_iter_mut(Axis(0)).enumerate() {
-            for (j, col) in row.iter_mut().enumerate() {
-                *col = targets[j][i];
-            }
-        }
+        // get these target outputs into a ndarray matrix
+        target_outputs
+            // iterate over columns
+            .axis_iter_mut(Axis(1))
+            // zip with target instances (each column is one moment in time)
+            .zip(targets.iter())
+            .for_each(|(mut col, target)| {
+                // assign each row in this column
+                col.iter_mut().zip(target.iter()).for_each(|(a, b)| *a = *b);
+            });
 
         // pseudo-inverse calculation -> doesn't allow for regularization!
         let pseudo_inv = pseudo_inverse(&states, self.regularization);
@@ -445,7 +495,7 @@ impl Reservoir {
 
                 let yxt = target_outputs.dot(&states.t());
                 let xxt = states.dot(&states.t());
-                let lambdas = self.regularization * Array2::eye(self.state.len());
+                let lambdas = self.regularization * Array2::eye(self.visible_count);
                 let xxt_lambda_inv = (xxt + lambdas).inv().unwrap();
                 yxt.dot(&xxt_lambda_inv)
             }

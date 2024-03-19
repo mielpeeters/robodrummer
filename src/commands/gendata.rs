@@ -125,7 +125,10 @@ fn pattern_to_csv(pattern: &RhythmPattern, args: &GenerateDataArgs) -> Result<()
     let mut beat_index = 0;
     let mut rng = rand::thread_rng();
 
-    while time_ms < args.duration_s * 1000.0 {
+    let mut steady = false;
+    let steady_duration = args.steady_state as f64;
+
+    while time_ms < args.duration_s * 1000.0 + steady_duration {
         let mut target = "";
         if time_ms % ms_per_pulse < args.timestep {
             if pattern[pattern_index % pattern.len()] {
@@ -136,9 +139,14 @@ fn pattern_to_csv(pattern: &RhythmPattern, args: &GenerateDataArgs) -> Result<()
             pattern_index += 1;
         }
 
+        if args.steady_state > 0 && time_ms > args.duration_s * 1000.0 && !steady {
+            log::info!("Entering steady state phase");
+            steady = true;
+        }
+
         let mut input = "0";
-        if t == t_next_input {
-            remaining_inputs = args.width;
+        if !steady && t == t_next_input {
+            remaining_inputs = (args.width / args.timestep) as i32;
             beat_index += 1;
 
             // calculate the next input time

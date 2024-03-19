@@ -1,5 +1,7 @@
 use ndarray::Array1;
 
+use crate::errors::NeuronError::DataNotFound;
+
 fn neuroner_dir() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     // get the data dir for this app
     let mut path = dirs::data_dir().expect("Should get the data directory");
@@ -163,7 +165,9 @@ pub fn load_train_data(name: &str) -> Result<Data, Box<dyn std::error::Error>> {
     let mut data_path = data_dir()?;
     data_path.push(format!("{}.csv", name));
 
-    let mut rdr = csv::Reader::from_path(data_path)?;
+    let Ok(mut rdr) = csv::Reader::from_path(&data_path) else {
+        return Err(Box::new(DataNotFound(name.to_string())));
+    };
 
     let mut inputs = vec![];
     let mut targets = vec![];

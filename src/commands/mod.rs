@@ -119,9 +119,13 @@ pub struct TrainArgs {
     /// Use the grid structure
     #[arg(long, default_value_t = false)]
     pub grid: bool,
+
+    /// Use python-exported data
+    #[arg(long)]
+    pub npy: Option<String>,
 }
 
-#[derive(Args, Debug, Serialize, Deserialize)]
+#[derive(Args, Debug, Serialize, Deserialize, Default)]
 pub struct GenerateDataArgs {
     /// The algorithm used to generate rhythmic patterns
     #[command(subcommand)]
@@ -147,13 +151,17 @@ pub struct GenerateDataArgs {
     #[arg(short, long, default_value_t = 1)]
     pub scale: u8,
 
-    /// The width of the input pulses
-    #[arg(short, long, default_value_t = 20)]
-    pub width: usize,
+    /// The width of the input pulses (milliseconds)
+    #[arg(short, long, default_value_t = 40.0)]
+    pub width: f64,
 
     /// The amount of seconds of data to generate
     #[arg(short, long = "dur", default_value_t = 10.0)]
     pub duration_s: f64,
+
+    /// Should the data generate a steady-state input phase (timesteps)
+    #[arg(long, default_value_t = 0)]
+    pub steady_state: usize,
 }
 
 #[derive(Subcommand, Debug, Serialize, Deserialize)]
@@ -161,6 +169,12 @@ pub enum RhythmAlgorithm {
     Euclidean(EucledeanArgs),
     NPDAG(NPDAGArgs),
     PolyEuclidean(PolyEuclideanArgs),
+}
+
+impl Default for RhythmAlgorithm {
+    fn default() -> Self {
+        RhythmAlgorithm::Euclidean(EucledeanArgs::default())
+    }
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]
@@ -172,6 +186,12 @@ pub struct EucledeanArgs {
     /// The amount of onsets in the euclidean rhythm
     #[arg(short, long, default_value_t = 5)]
     pub k: usize,
+}
+
+impl Default for EucledeanArgs {
+    fn default() -> Self {
+        EucledeanArgs { n: 16, k: 5 }
+    }
 }
 
 #[derive(Args, Debug, Serialize, Deserialize)]

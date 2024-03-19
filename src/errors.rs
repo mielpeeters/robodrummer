@@ -12,6 +12,9 @@ pub enum NeuronError {
     IndexOutOfRange(usize, usize),
     CantCreateMidiOut,
     CantConnectMidi,
+    FileNotFound(String),
+    DataNotFound(String),
+    ModelNotFound(String),
 }
 
 impl Display for NeuronError {
@@ -26,6 +29,9 @@ impl Display for NeuronError {
             NeuronError::CantConnectMidi => {
                 write!(f, "Can't connect to that midi port...")
             }
+            NeuronError::FileNotFound(s) => write!(f, "File `{}` not found.", s),
+            NeuronError::DataNotFound(d) => write!(f, "Data `{}` does not extist.", d),
+            NeuronError::ModelNotFound(m) => write!(f, "Model `{}` does not extist.", m),
         }
     }
 }

@@ -6,8 +6,20 @@ use std::fs;
 use std::io::Write;
 use std::{error::Error, path::PathBuf};
 
+use serde::Deserialize;
+
 use super::Reservoir;
 use crate::data::models_dir;
+
+#[derive(Debug, Deserialize)]
+pub struct NpyMetaData {
+    pub leak_rate: f64,
+    pub n: usize,
+    pub res_res_path: String,
+    pub in_res_path: String,
+    pub bias_path: String,
+    pub out_path: String,
+}
 
 impl Reservoir {
     pub fn save_to_file(&self, filename: PathBuf) -> Result<(), Box<dyn Error>> {
