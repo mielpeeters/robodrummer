@@ -1,6 +1,6 @@
 use std::{
     error::Error,
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
@@ -17,8 +17,8 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
 
     // get parsed arguments
     let model = args.model;
-    let zmq_port_pub = args.zmq_port_pub;
-    let zmq_port_sub = args.zmq_port_sub;
+    let zmq_port_pub = args.network_port;
+    let zmq_port_sub = args.metronome_port;
 
     // open the selected network
     let mut nw = Reservoir::load_from_name(&model)?;

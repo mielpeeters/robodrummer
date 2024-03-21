@@ -1,4 +1,4 @@
-pub mod activation;
+mod activation;
 pub mod commands;
 pub mod constants;
 pub mod data;

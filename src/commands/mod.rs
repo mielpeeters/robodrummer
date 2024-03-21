@@ -2,20 +2,28 @@
 * This module defines the command line interface for the application using clap.
 */
 
+mod combine;
 mod completions;
 mod gendata;
 mod run;
 mod train;
 
-use clap::{Args, Parser, Subcommand};
+use std::{fmt::Display, num::NonZeroU8};
+
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
 use serde::{Deserialize, Serialize};
 
+pub use combine::combine;
 pub use completions::update_completions;
 pub use gendata::gendata;
 pub use run::run;
 pub use train::train;
 
+const METRONOME_PORT: u16 = 5432;
+const FEEL_PORT: u16 = 4321;
+const MIDI_PORT: u16 = 6543;
+const OSC_PORT: u16 = 30000;
 #[derive(Parser, Debug)]
 pub struct Arguments {
     /// The subcommand to run
@@ -29,6 +37,7 @@ pub enum Command {
     Run(RunArgs),
     GenerateData(GenerateDataArgs),
     Completions(CompletionsArgs),
+    Combine(CombinerArgs),
 }
 
 #[derive(Args, Debug)]
@@ -46,15 +55,15 @@ pub struct RunArgs {
     pub list: bool,
 
     /// Port on which the network output is published using zmq
-    #[arg(short, long, default_value_t = 4321)]
-    pub zmq_port_pub: u16,
+    #[arg(long, default_value_t = FEEL_PORT)]
+    pub network_port: u16,
 
     // Port on which to listen for metronome value
-    #[arg(short, long, default_value_t = 5432)]
-    pub zmq_port_sub: u16,
+    #[arg(long, default_value_t = METRONOME_PORT)]
+    pub metronome_port: u16,
 
     /// Port on which the network output is published using osc
-    #[arg(short, long, default_value_t = 30000)]
+    #[arg(short, long, default_value_t = OSC_PORT)]
     pub osc_port: u16,
 }
 
@@ -225,4 +234,82 @@ pub struct CompletionsArgs {
     /// The shell for which to generate completions (only zsh works)
     #[arg(short, long, default_value = "zsh", value_enum)]
     pub shell: Shell,
+}
+
+#[derive(Args, Debug)]
+pub struct CombinerArgs {
+    /// port of the metronome publisher
+    #[arg(short, long, default_value_t = METRONOME_PORT)]
+    metro_port: u16,
+
+    /// port of the rhythmic feel publisher
+    #[arg(short, long, default_value_t = FEEL_PORT)]
+    feel_port: u16,
+
+    /// threshold for model output selection
+    #[arg(short, long, default_value_t = 0.5)]
+    threshold: f32,
+
+    /// Subdivision of metronome beat
+    #[arg(short, long, default_value_t = 1)]
+    subdivision: u8,
+
+    /// output mode
+    #[command(subcommand)]
+    output: OutputMode,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum OutputMode {
+    Drum,
+    Arpeggio(ArpeggioArgs),
+    CC(CCArgs),
+}
+
+impl Display for OutputMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OutputMode::Drum => write!(f, "drum"),
+            OutputMode::Arpeggio(_) => write!(f, "arpeggio"),
+            OutputMode::CC(_) => write!(f, "cc"),
+        }
+    }
+}
+
+#[derive(Args, Debug, Copy, Clone)]
+pub struct CCArgs {
+    /// The midi CC value to adjust
+    #[arg(short, long, default_value_t = 3)]
+    pub cc: u8,
+
+    /// The midi channel to output on
+    #[arg(long = "ch", default_value = "1")]
+    pub channel: u8,
+
+    /// the width of the adjustment
+    #[arg(short, long, default_value = "127")]
+    pub width: NonZeroU8,
+
+    /// Offset value around which to evolve the cc output
+    #[arg(short, long, default_value_t = 0)]
+    pub offset: u8,
+
+    /// The output cannot go below the offset
+    #[arg(short, long, default_value_t = false)]
+    pub non_negative: bool,
+}
+
+#[derive(Args, Debug, Copy, Clone)]
+pub struct ArpeggioArgs {
+    /// The port on which to listen for midi chords
+    #[arg(short, long, default_value_t = MIDI_PORT)]
+    pub midi_port: u16,
+
+    /// The midi channel to output on
+    #[arg(long = "ch", default_value = "1")]
+    pub channel: u8,
+
+    /// Duration of arpeggio notes
+    #[arg(short, long, default_value_t = 0.5)]
+    pub duration: f32,
 }
