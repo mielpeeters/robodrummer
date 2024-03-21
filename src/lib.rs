@@ -1,4 +1,5 @@
 mod activation;
+mod arpeggio;
 pub mod commands;
 pub mod constants;
 pub mod data;

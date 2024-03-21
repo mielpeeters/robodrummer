@@ -3,6 +3,7 @@ extern crate openblas_src;
 
 use clap::Parser;
 
+use neuroner::commands::broke;
 use neuroner::commands::combine;
 use neuroner::commands::gendata;
 use neuroner::commands::run;
@@ -20,6 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         neuroner::commands::Command::Run(r) => run(r),
         neuroner::commands::Command::GenerateData(g) => gendata(g),
         neuroner::commands::Command::Completions(c) => update_completions(c),
+        neuroner::commands::Command::MidiBroker(m) => broke(m),
         neuroner::commands::Command::Combine(c) => combine(c),
     }
 }

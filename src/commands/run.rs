@@ -26,17 +26,6 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
     // generate the sparse representation for efficient multiplication
     nw.generate_sparse();
 
-    // set up midi input connection
-    let last_input = Arc::new(RwLock::new(0));
-    let mut last_known_input: u64 = 0;
-    let _midi_in = midier::create_midi_input_and_connect(
-        |stamp, _msg, input| {
-            println!("Midi Input");
-            *input.write().unwrap() = stamp;
-        },
-        Arc::clone(&last_input),
-    );
-
     // set up network output connection
     let context = zmq::Context::new();
     let publisher = context.socket(zmq::PUB)?;
@@ -55,6 +44,11 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
         *mt.lock().unwrap() = value;
     });
 
+    // listen for midi inputs
+    let midi_in = context.socket(zmq::SUB)?;
+    midi_in.connect(&format!("tcp://localhost:{}", args.midi_port))?;
+    midi_in.set_subscribe(b"")?;
+
     // set up osc output Socket
     let osc_sock = oscutil::create_socket(args.osc_port);
 
@@ -71,11 +65,9 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
 
         // input zero on non-inputs, 1 on inputs
         let mut input = Array1::zeros(nw.inputs);
-        let user_input = *last_input.read().unwrap();
-        if last_known_input != user_input {
+        if midi_in.recv_bytes(zmq::DONTWAIT).is_ok() {
             // HACK: this parameter is controlled by the training input pulse width...
             input_steps_remaining = 20;
-            last_known_input = user_input;
         }
 
         if input_steps_remaining > 0 {

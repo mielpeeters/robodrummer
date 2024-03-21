@@ -5,6 +5,7 @@
 mod combine;
 mod completions;
 mod gendata;
+mod midi_broker;
 mod run;
 mod train;
 
@@ -17,6 +18,7 @@ use serde::{Deserialize, Serialize};
 pub use combine::combine;
 pub use completions::update_completions;
 pub use gendata::gendata;
+pub use midi_broker::broke;
 pub use run::run;
 pub use train::train;
 
@@ -24,6 +26,7 @@ const METRONOME_PORT: u16 = 5432;
 const FEEL_PORT: u16 = 4321;
 const MIDI_PORT: u16 = 6543;
 const OSC_PORT: u16 = 30000;
+
 #[derive(Parser, Debug)]
 pub struct Arguments {
     /// The subcommand to run
@@ -37,6 +40,7 @@ pub enum Command {
     Run(RunArgs),
     GenerateData(GenerateDataArgs),
     Completions(CompletionsArgs),
+    MidiBroker(MidiBrokerArgs),
     Combine(CombinerArgs),
 }
 
@@ -61,6 +65,10 @@ pub struct RunArgs {
     // Port on which to listen for metronome value
     #[arg(long, default_value_t = METRONOME_PORT)]
     pub metronome_port: u16,
+
+    /// Port on which the midi inputs come in
+    #[arg(long, default_value_t = MIDI_PORT)]
+    pub midi_port: u16,
 
     /// Port on which the network output is published using osc
     #[arg(short, long, default_value_t = OSC_PORT)]
@@ -234,6 +242,31 @@ pub struct CompletionsArgs {
     /// The shell for which to generate completions (only zsh works)
     #[arg(short, long, default_value = "zsh", value_enum)]
     pub shell: Shell,
+}
+
+#[derive(Args, Debug)]
+pub struct MidiBrokerArgs {
+    /// The port on which to publish midi messages
+    #[arg(short, long, default_value_t = MIDI_PORT)]
+    pub port: u16,
+
+    /// The mode to operate on
+    #[arg(short, long, default_value = "single", value_enum)]
+    pub mode: BrokerMode,
+
+    /// The amount of notes that make up a chord
+    #[arg(short, long, default_value_t = 3)]
+    pub chord_size: usize,
+
+    /// The channel to filter inputs on
+    #[arg(long = "ch")]
+    pub channel: Option<u8>,
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+pub enum BrokerMode {
+    Single,
+    Chord,
 }
 
 #[derive(Args, Debug)]
