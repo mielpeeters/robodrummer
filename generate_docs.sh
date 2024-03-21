@@ -8,4 +8,4 @@ cargo doc --no-deps
 echo "<meta http-equiv=\"refresh\" content=\"0; url=neuroner\">" > target/doc/index.html
 
 # copy the documentation to the `docs` folder
-cp -r target/doc ./docs
+cp -r target/doc/* ./docs/
