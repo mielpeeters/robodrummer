@@ -1,5 +1,6 @@
 <p align="center">
     <img src="./docs/neuroner.svg" />
+    <br>
     The goal of `neuroner` is to implement all of the code that's required to make the RoboDrummer thesis project work.
 </p>
 
