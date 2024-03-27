@@ -1,6 +1,6 @@
 use std::{fmt::Display, fs, path::PathBuf, time::Instant};
 
-use ndarray::{s, Array, Array1, Array2, Axis, Dimension, Ix2};
+use ndarray::{s, Array, Array1, Array2, ArrayView1, Axis, Dimension, Ix2};
 use ndarray_linalg::{Eig, Inverse, SVD};
 use ndarray_npy::ReadNpyExt;
 use ndarray_rand::{rand_distr::StandardNormal, RandomExt};
@@ -412,6 +412,10 @@ impl Reservoir {
 
     pub fn get_output(&self, output_id: usize) -> f64 {
         *self.output.get(output_id).unwrap()
+    }
+
+    pub fn get_visible_state(&self) -> ArrayView1<f64> {
+        self.state.slice(s![..self.visible_count])
     }
 
     /// Train the reservoir using the pseudo-inverse method.

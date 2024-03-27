@@ -1,9 +1,15 @@
 import matplotlib.pyplot as plt
 import pandas as pd
+import sys
 # import scipy.fftpack
 # import numpy as np
 
-df = pd.read_csv('out.csv')
+# if argument is given, it is the path to the csv file
+file = "out.csv"
+if len(sys.argv) > 1:
+    file = sys.argv[1]
+
+df = pd.read_csv(file)
 
 df = df.set_index('t')
 

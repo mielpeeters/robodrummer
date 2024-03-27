@@ -168,10 +168,23 @@ pub fn list_data() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub type Data = (Vec<Array1<f64>>, Vec<Option<Array1<f64>>>);
+
+/// Load the training data from a `.bin` file
+///
+/// The training data is stored in a time-domain format,
+/// and needs to be converted to a discrete timestep format.
+/// This is where the parameters `timestep` and `input_width` come into play.
+///
+/// # Arguments
+/// - `name`: The name of the training data file
+/// - `timestep`: The time between each timestep
+/// - `input_width`: The number of timesteps to consider as input
+/// - `shift`: the amount of timesteps to shift the target data into the future
 pub fn load_train_data(
     name: &str,
     timestep: f64,
     input_width: usize,
+    shift: Option<usize>,
 ) -> Result<Data, Box<dyn std::error::Error>> {
     let mut data_path = data_dir()?;
     data_path.push(format!("{}.bin", name));
@@ -221,6 +234,30 @@ pub fn load_train_data(
 
         time_ms += timestep;
     }
+
+    // move the first targets
+    if let Some(shift) = shift {
+        let mut new_targets = vec![];
+        targets
+            .iter()
+            .skip(shift)
+            .for_each(|x| new_targets.push(x.clone()));
+
+        // add None for the shifted targets
+        for _ in 0..shift {
+            new_targets.push(None);
+        }
+
+        // we expect these to be equal length
+        assert_eq!(targets.len(), new_targets.len());
+
+        println!("Shifted targets by {} timesteps", shift);
+
+        targets = new_targets;
+    }
+
+    // we expect the inputs and targets to be the same length
+    assert_eq!(inputs.len(), targets.len());
 
     Ok((inputs, targets))
 }

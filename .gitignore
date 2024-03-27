@@ -1,2 +1,6 @@
 /target
 out.csv
+int_states.csv
+# flamegraph
+perf.data
+flame.svg

@@ -144,6 +144,10 @@ pub struct TrainArgs {
     /// Use python-exported data
     #[arg(long)]
     pub npy: Option<String>,
+
+    /// Shift the target data to achieve delay compensation [ms]
+    #[arg(long)]
+    pub shift: Option<u8>,
 }
 
 #[derive(Args, Debug, Serialize, Deserialize, Default)]
