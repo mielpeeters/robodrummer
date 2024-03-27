@@ -85,6 +85,10 @@ pub struct TrainArgs {
     #[arg(long, default_value_t = 300)]
     pub iter: u64,
 
+    /// The width (# timesteps) of an input
+    #[arg(long, default_value_t = 30)]
+    pub width: usize,
+
     /// Training step: learning rate
     #[arg(short, long = "rate", default_value_t = 0.05)]
     pub learning_rate: f64,
@@ -148,13 +152,17 @@ pub struct GenerateDataArgs {
     #[command(subcommand)]
     pub algorithm: RhythmAlgorithm,
 
+    /// Chebyshev density (amount of zeros per beat, approximately)
+    #[arg(short, long)]
+    pub density: Option<u8>,
+
+    /// Offset for chebyshev point generation
+    #[arg(long, default_value_t = 0.0)]
+    pub offset: f64,
+
     /// The output name to write the data to (saved at $XDG_DATA_HOME/neuroner/traindata/{name}/)
     #[arg(short, long, default_value = "default")]
     pub output: String,
-
-    /// The amount of ms between evaluations
-    #[arg(short, long, default_value_t = 2.0)]
-    pub timestep: f64,
 
     /// The beats per minute on which the model is trained
     #[arg(short, long, default_value_t = 120.0)]
@@ -167,10 +175,6 @@ pub struct GenerateDataArgs {
     /// The amount with which to scale (speed up) the rhythm compared to the base bpm
     #[arg(short, long, default_value_t = 1)]
     pub scale: u8,
-
-    /// The width of the input pulses (milliseconds)
-    #[arg(short, long, default_value_t = 40.0)]
-    pub width: f64,
 
     /// The amount of seconds of data to generate
     #[arg(short, long = "dur", default_value_t = 10.0)]
@@ -207,7 +211,7 @@ pub struct EucledeanArgs {
 
 impl Default for EucledeanArgs {
     fn default() -> Self {
-        EucledeanArgs { n: 16, k: 5 }
+        EucledeanArgs { n: 8, k: 3 }
     }
 }
 

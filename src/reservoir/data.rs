@@ -26,6 +26,7 @@ impl Reservoir {
         let mut file = fs::OpenOptions::new()
             .create(true)
             .write(true)
+            .truncate(true)
             .open(filename)?;
 
         let model = bincode::serialize(self)?;

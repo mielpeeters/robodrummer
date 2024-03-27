@@ -20,7 +20,7 @@ pub fn train(args: super::TrainArgs) -> Result<(), Box<dyn Error>> {
     let mut nw = Reservoir::from_args(&args);
 
     // TODO: get the input data from a file
-    let data = load_train_data(&args.data)?;
+    let data = load_train_data(&args.data, args.timestep, args.width)?;
 
     // get data and perform splits
     let inputs = data.0;

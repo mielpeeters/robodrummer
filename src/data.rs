@@ -1,6 +1,13 @@
-use ndarray::Array1;
+use std::{collections::VecDeque, io::Read};
 
-use crate::errors::NeuronError::DataNotFound;
+use ndarray::{array, Array1};
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
+pub struct TrainData {
+    pub inputs: VecDeque<(f64, bool)>,
+    pub targets: VecDeque<(f64, bool)>,
+}
 
 fn neuroner_dir() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     // get the data dir for this app
@@ -161,34 +168,58 @@ pub fn list_data() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub type Data = (Vec<Array1<f64>>, Vec<Option<Array1<f64>>>);
-pub fn load_train_data(name: &str) -> Result<Data, Box<dyn std::error::Error>> {
+pub fn load_train_data(
+    name: &str,
+    timestep: f64,
+    input_width: usize,
+) -> Result<Data, Box<dyn std::error::Error>> {
     let mut data_path = data_dir()?;
-    data_path.push(format!("{}.csv", name));
+    data_path.push(format!("{}.bin", name));
 
-    let Ok(mut rdr) = csv::Reader::from_path(&data_path) else {
-        return Err(Box::new(DataNotFound(name.to_string())));
-    };
+    let mut data_file = std::fs::OpenOptions::new().read(true).open(data_path)?;
+
+    let mut data = vec![];
+    data_file.read_to_end(&mut data)?;
+
+    let mut train_data: TrainData = bincode::deserialize(data.as_slice())?;
+
+    let mut time_ms = 0.0;
+    let mut remaining_inputs = 0;
 
     let mut inputs = vec![];
     let mut targets = vec![];
 
-    for result in rdr.records() {
-        let record = result?;
-        let input: Array1<f64> = record
-            .iter()
-            .skip(1)
-            .take(1)
-            .map(|x| x.parse().unwrap())
-            .collect();
-        let target: Option<Array1<f64>> = record
-            .iter()
-            .skip(2)
-            .take(1)
-            .map(|x| x.parse().ok())
-            .collect();
+    while !train_data.targets.is_empty() && !train_data.inputs.is_empty() {
+        // this timestep's target
+        let mut target = None;
+        if train_data.targets[0].0 <= time_ms {
+            let target_val = match train_data.targets[0].1 {
+                true => 1.0,
+                false => 0.0,
+            };
+            // this timestep is a target time
+            target = Some(array![target_val]);
+            train_data.targets.pop_front();
+        }
+
+        if train_data.inputs[0].0 <= time_ms {
+            train_data.inputs.pop_front();
+            remaining_inputs = input_width;
+        }
+
+        let mut input_val = 0.0;
+
+        if remaining_inputs > 0 {
+            input_val = 1.0;
+            remaining_inputs -= 1;
+        }
+
+        let input = array![input_val];
 
         inputs.push(input);
         targets.push(target);
+
+        time_ms += timestep;
     }
 
     Ok((inputs, targets))
