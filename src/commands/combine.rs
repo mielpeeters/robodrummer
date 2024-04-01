@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use guier::Gui;
+use crate::guier::Gui;
 use midi_control::{ControlEvent, KeyEvent, MidiMessage, MidiMessageSend};
 
 use super::{ArpeggioArgs, CCArgs, CombinerArgs};

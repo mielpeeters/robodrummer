@@ -1,6 +1,7 @@
 use std::error::Error;
 
 use crate::{
+    commands::TrainMode,
     data::{list_data, load_train_data, models_dir},
     reservoir::Reservoir,
     trainutil::create_progress_bar,
@@ -111,6 +112,8 @@ pub fn train(args: super::TrainArgs) -> Result<(), Box<dyn Error>> {
 
     let mut nw = Reservoir::from_args(&args);
 
+    nw.generate_sparse();
+
     // TODO: get the input data from a file
     let shift = match args.shift {
         Some(shift) => Some((shift as f64 / args.timestep).round() as usize),
@@ -140,7 +143,11 @@ pub fn train(args: super::TrainArgs) -> Result<(), Box<dyn Error>> {
         // save the history before any adjustments
         weight_history.assign(&nw.weights_res_out);
 
-        let error = nw.train_step(train_inputs, targets);
+        let error = match args.mode {
+            TrainMode::Inv => nw.train_step(train_inputs, targets),
+            TrainMode::Grad => nw.train_mse_grad(train_inputs, targets),
+        };
+
         errors.push(error);
         pb.inc(1);
 

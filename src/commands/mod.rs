@@ -148,52 +148,65 @@ pub struct TrainArgs {
     /// Shift the target data to achieve delay compensation [ms]
     #[arg(long)]
     pub shift: Option<u8>,
+
+    /// The train update that's used for offline training
+    #[arg(long, default_value = "inv", value_enum)]
+    pub mode: TrainMode,
 }
 
-#[derive(Args, Debug, Serialize, Deserialize, Default)]
-pub struct GenerateDataArgs {
-    /// The algorithm used to generate rhythmic patterns
-    #[command(subcommand)]
-    pub algorithm: RhythmAlgorithm,
-
-    /// Chebyshev density (amount of zeros per beat, approximately)
-    #[arg(short, long)]
-    pub density: Option<u8>,
-
-    /// Offset for chebyshev point generation
-    #[arg(long, default_value_t = 0.0)]
-    pub offset: f64,
-
-    /// The output name to write the data to (saved at $XDG_DATA_HOME/neuroner/traindata/{name}/)
-    #[arg(short, long, default_value = "default")]
-    pub output: String,
-
-    /// The beats per minute on which the model is trained
-    #[arg(short, long, default_value_t = 120.0)]
-    pub bpm: f64,
-
-    /// The variance to apply to the input data (is actually std dev)
-    #[arg(short, long, default_value_t = 5.0)]
-    pub variance: f64,
-
-    /// The amount with which to scale (speed up) the rhythm compared to the base bpm
-    #[arg(short, long, default_value_t = 1)]
-    pub scale: u8,
-
-    /// The amount of seconds of data to generate
-    #[arg(short, long = "dur", default_value_t = 10.0)]
-    pub duration_s: f64,
-
-    /// Should the data generate a steady-state input phase (timesteps)
-    #[arg(long, default_value_t = 0)]
-    pub steady_state: usize,
+#[derive(ValueEnum, Debug, Clone, Serialize, Deserialize, Default)]
+pub enum TrainMode {
+    #[default]
+    Inv,
+    Grad,
 }
 
-#[derive(Subcommand, Debug, Serialize, Deserialize)]
-pub enum RhythmAlgorithm {
-    Euclidean(EucledeanArgs),
-    NPDAG(NPDAGArgs),
-    PolyEuclidean(PolyEuclideanArgs),
+nest! {
+    #[derive(Args, Default)]
+    #[derive(Debug, Serialize, Deserialize)]*
+    pub struct GenerateDataArgs {
+        /// The algorithm used to generate rhythmic patterns
+        #[command(subcommand)]
+        pub algorithm:
+            #[derive(Subcommand)]
+            pub enum RhythmAlgorithm {
+                Euclidean(EucledeanArgs),
+                NPDAG(NPDAGArgs),
+                PolyEuclidean(PolyEuclideanArgs),
+            },
+
+        /// Chebyshev density (amount of zeros per beat, approximately)
+        #[arg(short, long)]
+        pub density: Option<u8>,
+
+        /// Offset for chebyshev point generation
+        #[arg(long, default_value_t = 0.0)]
+        pub offset: f64,
+
+        /// The output name to write the data to (saved at $XDG_DATA_HOME/neuroner/traindata/{name}/)
+        #[arg(short, long, default_value = "default")]
+        pub output: String,
+
+        /// The beats per minute on which the model is trained
+        #[arg(short, long, default_value_t = 120.0)]
+        pub bpm: f64,
+
+        /// The variance to apply to the input data (is actually std dev)
+        #[arg(short, long, default_value_t = 5.0)]
+        pub variance: f64,
+
+        /// The amount with which to scale (speed up) the rhythm compared to the base bpm
+        #[arg(short, long, default_value_t = 1)]
+        pub scale: u8,
+
+        /// The amount of seconds of data to generate
+        #[arg(short, long = "dur", default_value_t = 10.0)]
+        pub duration_s: f64,
+
+        /// Should the data generate a steady-state input phase (timesteps)
+        #[arg(long, default_value_t = 0)]
+        pub steady_state: usize,
+    }
 }
 
 impl Default for RhythmAlgorithm {
@@ -252,29 +265,30 @@ pub struct CompletionsArgs {
     pub shell: Shell,
 }
 
-#[derive(Args, Debug)]
-pub struct MidiBrokerArgs {
-    /// The port on which to publish midi messages
-    #[arg(short, long, default_value_t = MIDI_PORT)]
-    pub port: u16,
+nest! {
+    #[derive(Args, Debug)]
+    pub struct MidiBrokerArgs {
+        /// The port on which to publish midi messages
+        #[arg(short, long, default_value_t = MIDI_PORT)]
+        pub port: u16,
 
-    /// The mode to operate on
-    #[arg(short, long, default_value = "single", value_enum)]
-    pub mode: BrokerMode,
+        /// The mode to operate on
+        #[arg(short, long, default_value = "single", value_enum)]
+        pub mode:
+            #[derive(ValueEnum, Clone, Debug)]
+            pub enum BrokerMode {
+                Single,
+                Chord,
+            },
 
-    /// The amount of notes that make up a chord
-    #[arg(short, long, default_value_t = 3)]
-    pub chord_size: usize,
+        /// The amount of notes that make up a chord
+        #[arg(short, long, default_value_t = 3)]
+        pub chord_size: usize,
 
-    /// The channel to filter inputs on
-    #[arg(long = "ch")]
-    pub channel: Option<u8>,
-}
-
-#[derive(ValueEnum, Clone, Debug)]
-pub enum BrokerMode {
-    Single,
-    Chord,
+        /// The channel to filter inputs on
+        #[arg(long = "ch")]
+        pub channel: Option<u8>,
+    }
 }
 
 #[derive(Args, Debug)]

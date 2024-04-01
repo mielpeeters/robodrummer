@@ -84,6 +84,7 @@ pub mod commands;
 pub mod constants;
 pub mod data;
 mod errors;
+mod guier;
 pub mod midiutils;
 pub mod oscutil;
 pub mod reservoir;

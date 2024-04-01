@@ -4,8 +4,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::guier::Gui;
 use crate::{data::list_models, oscutil, reservoir::Reservoir};
-use guier::Gui;
 use ndarray::Array1;
 
 /// run the selected model, determined by the parameters in args.

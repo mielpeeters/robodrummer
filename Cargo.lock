@@ -639,10 +639,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "guier"
-version = "0.1.0"
-
-[[package]]
 name = "hashbrown"
 version = "0.14.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -969,9 +965,9 @@ dependencies = [
 
 [[package]]
 name = "nestify"
-version = "0.3.1"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f2d5c10ec2809e4d0ee6b88c2c22f50982522e5afd6118dd72786f7ecddcf95"
+checksum = "41d7249f7122d4e8a40f3b1b1850b763d2f864bf8e4b712427f024f8a167ea17"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -990,7 +986,6 @@ dependencies = [
  "csv",
  "dirs 5.0.1",
  "env_logger",
- "guier",
  "indicatif",
  "log",
  "make-csv",

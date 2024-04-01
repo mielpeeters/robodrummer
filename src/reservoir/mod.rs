@@ -202,7 +202,8 @@ impl ReservoirBuilder {
         // either_or(&mut weights_out_res, -0.1, 0.1, 0.5, &mut rng);
 
         // let bias_res: Array1<f64> = Array::random((size,), StandardNormal);
-        let bias_res: Array1<f64> = Array::random((size,), Uniform::new(-0.01, 0.01));
+        // let bias_res: Array1<f64> = Array::random((size,), Uniform::new(-0.01, 0.01));
+        let bias_res: Array1<f64> = Array::zeros((size,));
         let bias_out: Array1<f64> = Array::random((outputs,), Uniform::new(-0.01, 0.01));
 
         self.0.state = state;
@@ -380,6 +381,27 @@ impl Reservoir {
         self.leak_rate += amount;
     }
 
+    /// forward the externally supplied state, and return the output array
+    pub fn forward_external(&self, state: &mut Array1<f64>, input: &Array1<f64>) -> Array1<f64> {
+        let mut new_state = match &self.weights_rr_sparse {
+            Some(sparse) => {
+                let mut res = Array::<f64, _>::zeros(state.len());
+                mul_acc_mat_vec_csr(sparse.view(), state.view(), res.view_mut());
+                res
+            }
+            None => self.weights_res_res.dot(state),
+        };
+
+        new_state = new_state + self.weights_in_res.dot(input);
+        new_state += &self.bias_res;
+        new_state.mapv_inplace(|x| self.activation.apply(x));
+        *state *= 1.0 - self.leak_rate;
+        *state += &(self.leak_rate * &new_state);
+
+        self.weights_res_out
+            .dot(&state.slice(s![..self.visible_count]))
+    }
+
     pub fn forward(&mut self, input: &Array1<f64>) {
         // make sure the sparse representation is available
         self.generate_sparse();
@@ -398,6 +420,7 @@ impl Reservoir {
         };
         let resres_time = start.elapsed();
         new_state = new_state + self.weights_in_res.dot(input);
+        new_state += &self.bias_res;
         new_state.mapv_inplace(|x| self.activation.apply(x));
         self.state = (1.0 - self.leak_rate) * &self.state + self.leak_rate * &new_state;
 
@@ -416,6 +439,63 @@ impl Reservoir {
 
     pub fn get_visible_state(&self) -> ArrayView1<f64> {
         self.state.slice(s![..self.visible_count])
+    }
+
+    /// Perform some gradient descent training steps on the network,
+    /// using MSE as the loss function.
+    ///
+    /// returns the average squared error
+    pub fn train_mse_grad(
+        &mut self,
+        inputs: &[Array1<f64>],
+        targets: &[Option<Array1<f64>>],
+    ) -> f64 {
+        assert!(inputs.len() == targets.len());
+
+        // initialize a zero state vector
+        let mut state: Array1<f64> = Array1::zeros(self.size);
+
+        // keep track of the gradient of the SE w.r.t. the output weights
+        let mut grad: Array2<f64> = Array2::zeros(self.weights_res_out.dim());
+
+        let mut error: f64 = 0.0;
+        let mut target_count = 0;
+
+        let mut grad_tmp = Array2::zeros(self.weights_res_out.dim());
+
+        for (target, input) in targets.iter().zip(inputs) {
+            let output = self.forward_external(&mut state, input);
+
+            // calculate diff error / diff output
+            let Some(target) = target else {
+                continue;
+            };
+
+            target_count += 1;
+
+            let diff = output - target;
+
+            // add to the error
+            error += diff.dot(&diff);
+
+            // calculate the gradient for this timestep
+            let diff_arr = diff.into_shape((self.outputs, 1)).unwrap();
+            let state_arr = state
+                .slice(s![..self.visible_count])
+                .into_shape((self.visible_count, 1))
+                .unwrap();
+            grad_tmp.assign(&diff_arr.dot(&state_arr.t()));
+
+            grad += &grad_tmp;
+        }
+
+        // average the gradient and error
+        grad /= target_count as f64;
+
+        // apply the gradient
+        self.weights_res_out = &self.weights_res_out - self.learning_rate * grad;
+
+        error
     }
 
     /// Train the reservoir using the pseudo-inverse method.
