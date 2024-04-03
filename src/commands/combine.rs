@@ -1,14 +1,23 @@
 use std::{
-    sync::{mpsc, Arc, Mutex},
-    time::Duration,
+    collections::VecDeque,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc, Arc, Mutex,
+    },
+    thread::sleep,
+    time::{Duration, Instant},
 };
 
-use crate::guier::Gui;
+use crate::{
+    guier::Gui,
+    robot::{self, WaveType},
+};
 use midi_control::{ControlEvent, KeyEvent, MidiMessage, MidiMessageSend};
 
 use super::{ArpeggioArgs, CCArgs, CombinerArgs};
 use crate::arpeggio::Arpeggio;
 
+/// Non-blocking receiving calls to the receiver until the last value has been retreived
 fn get_last_sent<T>(rx: &mpsc::Receiver<T>) -> Option<T> {
     let mut last = None;
     while let Ok(val) = rx.try_recv() {
@@ -21,16 +30,102 @@ fn threshold_nw(nw_output: f32, threshold: f32) -> bool {
     nw_output > threshold
 }
 
+fn freq_subd_to_wait(time_wait: f64, subd: u8) -> f64 {
+    time_wait / f64::from(subd)
+}
+
+fn drum_robot_loop(
+    args: CombinerArgs,
+    drum_args: super::DrumArgs,
+    mut gui: Gui,
+    metro_rx: mpsc::Receiver<f64>,
+    nw_rx: mpsc::Receiver<f32>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // inform the user of robotic output
+    gui.add_row("Robot", "");
+    gui.add_row("Network", 0);
+    gui.add_row("Wait Secs", 0);
+
+    // create the beat sender
+    let beat_send = Arc::new(AtomicBool::new(false));
+
+    // start the output stream
+    let _stream = robot::start(Arc::clone(&beat_send), WaveType::Sine(750.0, 0.05));
+
+    // wait for the first metronome signal
+    let mut metro = metro_rx.recv()?;
+    let mut nw_output = 0.0;
+
+    // create an agenda of future events
+    let output_agenda: Arc<Mutex<VecDeque<Instant>>> = Arc::new(Mutex::new(VecDeque::new()));
+
+    // start the output thread using the output agenda
+    let local_output_agenda = Arc::clone(&output_agenda);
+    let _handle = std::thread::spawn(move || loop {
+        // NOTE: this assumes that the outputs are ordered
+        let front_val = {
+            let mut out = local_output_agenda.lock().unwrap();
+            out.pop_front()
+        };
+        match front_val {
+            Some(time) => {
+                let now = Instant::now();
+                let time_left = time.checked_duration_since(now);
+                if let Some(wait) = time_left {
+                    // TMP: this one should be made a lot more accurate probably
+                    sleep(wait);
+                }
+                beat_send.store(true, Ordering::Relaxed);
+            }
+            None => {
+                // NOTE: this could lead to some additional delays
+                sleep(Duration::from_millis(5));
+            }
+        }
+    });
+
+    loop {
+        // check if we need to send an output in some time
+        nw_output = get_last_sent(&nw_rx).unwrap_or(nw_output);
+        gui.update_row("Network", &nw_output);
+        if threshold_nw(nw_output, args.threshold) {
+            let now = Instant::now();
+            let next_time = now + Duration::from_secs_f64(drum_args.offset)
+                - Duration::from_secs_f64(drum_args.delay);
+            let mut out = output_agenda.lock().unwrap();
+            out.push_back(next_time);
+            drop(out);
+        }
+
+        // get the last metronome reading
+        metro = get_last_sent(&metro_rx).unwrap_or(metro);
+        let wait_secs = freq_subd_to_wait(metro, args.subdivision);
+        gui.update_row("Wait Secs", &wait_secs);
+        gui.show();
+
+        sleep(Duration::from_secs_f64(wait_secs));
+    }
+}
+
 fn drum_loop(
     args: CombinerArgs,
+    drum_args: super::DrumArgs,
     mut gui: Gui,
     wait_rx: mpsc::Receiver<f64>,
     nw_rx: mpsc::Receiver<f32>,
-    mut midi_out: midir::MidiOutputConnection,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // GUI output
     gui.add_row("BPM", 120);
     gui.add_row("subdivision", args.subdivision);
+
+    // split of into the robotic output if desired
+    if let super::DrumOutput::Robot = drum_args.output {
+        return drum_robot_loop(args, drum_args, gui, wait_rx, nw_rx);
+    };
+
+    // connect to the midi output
+    let mut midi_out = midier::create_midi_output_and_connect()?;
+
     gui.add_row("playing", false);
 
     let mut playing = false;
@@ -65,7 +160,7 @@ fn drum_loop(
             local_bpm = bpm;
         }
 
-        std::thread::sleep(wait_dur);
+        sleep(wait_dur);
     }
 }
 
@@ -97,8 +192,10 @@ fn cc_loop(
     cc_args: CCArgs,
     mut gui: Gui,
     nw_rx: mpsc::Receiver<f32>,
-    mut midi_out: midir::MidiOutputConnection,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // connect to the midi output
+    let mut midi_out = midier::create_midi_output_and_connect()?;
+
     // GUI output
     gui.add_row("cc target", cc_args.cc);
     gui.add_row("value", 0);
@@ -138,7 +235,7 @@ fn cc_loop(
         gui.update_row("value", &cc_out);
         gui.show();
 
-        std::thread::sleep(Duration::from_millis(10));
+        sleep(Duration::from_millis(10));
     }
 }
 
@@ -149,8 +246,10 @@ fn arpeggio_loop(
     nw_rx: mpsc::Receiver<f32>,
     wait_rx: mpsc::Receiver<f64>,
     context: zmq::Context,
-    midi_out: midir::MidiOutputConnection,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // connect to the midi output
+    let midi_out = midier::create_midi_output_and_connect()?;
+
     // GUI output
     gui.add_row("chord", "None");
     gui.add_row("BPM", 120);
@@ -208,7 +307,7 @@ fn arpeggio_loop(
             let midi_local = Arc::clone(&midi_out);
             let to_stop = arpeggio.chord[arpeggio.current];
             let _handle = std::thread::spawn(move || {
-                std::thread::sleep(Duration::from_secs_f32(arpeggio.duration));
+                sleep(Duration::from_secs_f32(arpeggio.duration));
                 midi_local
                     .lock()
                     .unwrap()
@@ -235,14 +334,11 @@ fn arpeggio_loop(
             local_bpm = bpm;
         }
 
-        std::thread::sleep(wait_dur);
+        sleep(wait_dur);
     }
 }
 
 pub fn combine(args: CombinerArgs) -> Result<(), Box<dyn std::error::Error>> {
-    // connect to the midi output
-    let midi_out = midier::create_midi_output_and_connect()?;
-
     // connect to the metronome publisher
     let context = zmq::Context::new();
     let metronome = context.socket(zmq::SUB).unwrap();
@@ -280,10 +376,10 @@ pub fn combine(args: CombinerArgs) -> Result<(), Box<dyn std::error::Error>> {
     gui.add_row("output mode", &args.output);
 
     match args.output {
-        super::OutputMode::Drum => drum_loop(args, gui, wait_rx, nw_rx, midi_out),
+        super::OutputMode::Drum(d) => drum_loop(args, d, gui, wait_rx, nw_rx),
         super::OutputMode::Arpeggio(arp_args) => {
-            arpeggio_loop(args, arp_args, gui, nw_rx, wait_rx, context, midi_out)
+            arpeggio_loop(args, arp_args, gui, nw_rx, wait_rx, context)
         }
-        super::OutputMode::CC(cc_args) => cc_loop(args, cc_args, gui, nw_rx, midi_out),
+        super::OutputMode::CC(cc_args) => cc_loop(args, cc_args, gui, nw_rx),
     }
 }

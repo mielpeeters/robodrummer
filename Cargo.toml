@@ -5,6 +5,15 @@ edition = "2021"
 authors = ["Miel Peeters"]
 description = "A reservoir computing implementation for generating musical feeling."
 
+[profile.release]
+# TODO: re-enable me in the end
+# lto = true
+strip = true
+
+[build-dependencies]
+cc = "1.0.83"
+hound = "3.5.1"
+
 [dependencies]
 midier = { version = "0.1.0", path = "../midier" }
 ndarray = { version = "0.15.6", features = ["blas", "serde"] }
@@ -35,3 +44,4 @@ toml = "0.8.10"
 rand_distr = "0.4.3"
 clap_complete = "4.5.1"
 nestify = "0.3.3"
+cpal = { version = "0.15.2", features = ["jack"] }

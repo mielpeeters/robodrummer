@@ -88,5 +88,6 @@ mod guier;
 pub mod midiutils;
 pub mod oscutil;
 pub mod reservoir;
+pub mod robot;
 pub mod series;
 pub mod trainutil;

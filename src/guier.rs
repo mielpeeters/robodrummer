@@ -65,7 +65,11 @@ impl Gui {
         println!("\x1b[1;92m{}\x1b[0m", self.name);
         println!();
         for row in &self.rows {
-            println!("{}: {}", row.description, row.value);
+            if row.value.is_empty() {
+                println!("{}", row.description);
+            } else {
+                println!("{}: {}", row.description, row.value);
+            }
         }
     }
 }

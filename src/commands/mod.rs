@@ -13,6 +13,7 @@ use std::{fmt::Display, num::NonZeroU8};
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
+use nestify::nest;
 use serde::{Deserialize, Serialize};
 
 pub use combine::combine;
@@ -316,7 +317,7 @@ pub struct CombinerArgs {
 
 #[derive(Subcommand, Debug)]
 pub enum OutputMode {
-    Drum,
+    Drum(DrumArgs),
     Arpeggio(ArpeggioArgs),
     CC(CCArgs),
 }
@@ -324,9 +325,44 @@ pub enum OutputMode {
 impl Display for OutputMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            OutputMode::Drum => write!(f, "drum"),
+            OutputMode::Drum(d) => write!(f, "drum ({})", d.output),
             OutputMode::Arpeggio(_) => write!(f, "arpeggio"),
             OutputMode::CC(_) => write!(f, "cc"),
+        }
+    }
+}
+
+nest! {
+    /// Arguments for the drum output mode
+    #[derive(Args, Debug, Copy, Clone)]
+    pub struct DrumArgs {
+        /// Select either MIDI or Robot output
+        #[arg(short, long, default_value = "midi", value_enum)]
+        pub output:
+            #[derive(ValueEnum, Clone, Debug, Copy)]
+            pub enum DrumOutput {
+                /// Output to midi, without delay compensation
+                pub Midi,
+                /// Output to audio, used by the robot to
+                /// control the motor.
+                /// This does include delay compensation.
+                pub Robot,
+            },
+        /// The offset at which the rhythmic activity model was trained
+        #[arg(short, long, default_value_t = 0.0)]
+        pub offset: f64,
+
+        /// The amount of delay compensation to apply
+        #[arg(short, long, default_value_t = 0.0)]
+        pub delay: f64,
+    }
+}
+
+impl Display for DrumOutput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DrumOutput::Midi => write!(f, "midi"),
+            DrumOutput::Robot => write!(f, "robot"),
         }
     }
 }
