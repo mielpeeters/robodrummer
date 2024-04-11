@@ -1,13 +1,17 @@
-use std::{collections::VecDeque, io::Read};
+use std::{collections::VecDeque, error::Error, io::Read};
 
 use ndarray::{array, Array1};
 use serde::{Deserialize, Serialize};
+
+use crate::commands::{GenerateDataArgs, RhythmAlgorithm, TrainArgs};
 
 #[derive(Serialize, Deserialize)]
 pub struct TrainData {
     pub inputs: VecDeque<(f64, bool)>,
     pub targets: VecDeque<(f64, bool)>,
 }
+
+const TRAIN_DATA_HEIGHT: f64 = 1.0;
 
 fn neuroner_dir() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     // get the data dir for this app
@@ -46,33 +50,48 @@ pub fn data_dir() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     Ok(path)
 }
 
-pub fn get_model_metadata(name: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn show_model_meta(metadata: &TrainArgs) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "     - size: \x1b[38;5;216m{}\x1b[0m\n",
+        metadata.size
+    ));
+    output.push_str(&format!(
+        "     - mode: \x1b[38;5;216m{}\x1b[0m\n",
+        metadata.mode
+    ));
+    let structure = match metadata.npy {
+        Some(_) => "Euler ESN",
+        None => "Random ESN",
+    };
+    output.push_str(&format!(
+        "     - structure: \x1b[38;5;216m{}\x1b[0m\n",
+        structure
+    ));
+    output.push_str(&format!(
+        "     - dataset: \x1b[38;5;216m{}\x1b[0m",
+        metadata.data
+    ));
+    output
+}
+
+pub fn get_model_metadata(name: &str) -> Result<TrainArgs, Box<dyn Error>> {
     let meta_path = models_dir()?.join(format!("{}.toml", name));
 
-    let meta_info = if meta_path.exists() {
+    if meta_path.exists() {
         let toml_string = std::fs::read_to_string(meta_path)?;
-        let toml_value: toml::Value = toml::from_str(&toml_string)?;
-        let toml_table = toml_value.as_table().unwrap();
-
-        let mut info = vec![];
-
-        let keys_to_show = ["inputs", "outputs", "size", "timestep", "sr", "leak_rate"];
-
-        toml_table.iter().for_each(|(k, v)| {
-            if keys_to_show.contains(&k.as_str()) {
-                info.push(format!(
-                    "\x1b[38;5;245m{}\x1b[0m: \x1b[38;5;250m{}\x1b[0m",
-                    k, v
-                ));
-            }
-        });
-
-        info
+        let metadata: TrainArgs = toml::from_str(&toml_string)?;
+        Ok(metadata)
     } else {
-        ["NO METADATA".to_string()].to_vec()
-    };
+        Err(format!("No metadata exists for model name {}", name).into())
+    }
+}
 
-    Ok(meta_info.join(", "))
+pub fn model_metadata_string(name: &str) -> String {
+    match get_model_metadata(name) {
+        Ok(metadata) => show_model_meta(&metadata),
+        Err(_) => "NO METADATA".into(),
+    }
 }
 
 pub fn list_models() -> Result<(), Box<dyn std::error::Error>> {
@@ -98,42 +117,57 @@ pub fn list_models() -> Result<(), Box<dyn std::error::Error>> {
     println!("\x1b[1;92mTrained Models:\x1b[0m");
     let clr = 214;
     for (i, name) in seen_names.iter().enumerate() {
-        let meta_info = get_model_metadata(name)?;
+        let meta_info = model_metadata_string(name);
 
         println!("{i:3}: \x1b[38;5;{}m{name}\x1b[0m", clr as usize + i);
-        println!("    ({})", meta_info);
+        println!("{}", meta_info);
     }
 
     Ok(())
 }
 
-pub fn get_data_metadata(name: &str) -> Result<String, Box<dyn std::error::Error>> {
+fn show_data_meta(metadata: &GenerateDataArgs) -> String {
+    let mut output = String::new();
+    output.push_str(&format!(
+        "     - algorithm: \x1b[38;5;216m{}\x1b[0m\n",
+        metadata.algorithm
+    ));
+    if let RhythmAlgorithm::Euclidean(e) = &metadata.algorithm {
+        output.push_str(&format!("       - k: \x1b[38;5;70m{}\x1b[0m\n", e.k));
+        output.push_str(&format!("       - n: \x1b[38;5;70m{}\x1b[0m\n", e.n));
+    }
+    output.push_str(&format!(
+        "     - bpm: \x1b[38;5;216m{}\x1b[0m\n",
+        metadata.bpm
+    ));
+    output.push_str(&format!(
+        "     - variance: \x1b[38;5;216m{}\x1b[0m\n",
+        metadata.variance
+    ));
+    output.push_str(&format!(
+        "     - scale: \x1b[38;5;216m{}\x1b[0m",
+        metadata.scale
+    ));
+    output
+}
+
+pub fn get_data_metadata(name: &str) -> Result<GenerateDataArgs, Box<dyn Error>> {
     let meta_path = data_dir()?.join(format!("{}.toml", name));
 
-    let meta_info = if meta_path.exists() {
+    if meta_path.exists() {
         let toml_string = std::fs::read_to_string(meta_path)?;
-        let toml_value: toml::Value = toml::from_str(&toml_string)?;
-        let toml_table = toml_value.as_table().unwrap();
-
-        let mut info = vec![];
-
-        let keys_to_show = ["algorithm", "timestep", "bpm", "variance", "scale"];
-
-        toml_table.iter().for_each(|(k, v)| {
-            if keys_to_show.contains(&k.as_str()) {
-                info.push(format!(
-                    "\x1b[38;5;245m{}\x1b[0m: \x1b[38;5;250m{}\x1b[0m",
-                    k, v
-                ));
-            }
-        });
-
-        info
+        let metadata = toml::from_str(&toml_string)?;
+        Ok(metadata)
     } else {
-        ["NO METADATA".to_string()].to_vec()
-    };
+        Err(format!("No metadata exists for data name {}", name).into())
+    }
+}
 
-    Ok(meta_info.join(", "))
+pub fn data_metadata_string(name: &str) -> String {
+    match get_data_metadata(name) {
+        Ok(metadata) => show_data_meta(&metadata),
+        Err(_) => "NO METADATA".into(),
+    }
 }
 
 pub fn list_data() -> Result<(), Box<dyn std::error::Error>> {
@@ -159,9 +193,9 @@ pub fn list_data() -> Result<(), Box<dyn std::error::Error>> {
 
     let clr = 214;
     for (i, name) in seen_names.iter().enumerate() {
-        let meta_info = get_data_metadata(name)?;
+        let meta_info = data_metadata_string(name);
         println!("{i:3}: \x1b[38;5;{}m{name}\x1b[0m", clr as usize + i);
-        println!("    ({})", meta_info);
+        println!("{}", meta_info);
     }
 
     Ok(())
@@ -184,6 +218,7 @@ pub fn load_train_data(
     name: &str,
     timestep: f64,
     input_width: usize,
+    target_width: usize,
     shift: Option<usize>,
 ) -> Result<Data, Box<dyn std::error::Error>> {
     let mut data_path = data_dir()?;
@@ -206,11 +241,11 @@ pub fn load_train_data(
         // this timestep's target
         let mut target = None;
         if train_data.targets[0].0 <= time_ms {
+            // this timestep is a target time
             let target_val = match train_data.targets[0].1 {
-                true => 1.0,
+                true => TRAIN_DATA_HEIGHT,
                 false => 0.0,
             };
-            // this timestep is a target time
             target = Some(array![target_val]);
             train_data.targets.pop_front();
         }
@@ -223,7 +258,7 @@ pub fn load_train_data(
         let mut input_val = 0.0;
 
         if remaining_inputs > 0 {
-            input_val = 1.0;
+            input_val = TRAIN_DATA_HEIGHT;
             remaining_inputs -= 1;
         }
 
@@ -258,6 +293,25 @@ pub fn load_train_data(
 
     // we expect the inputs and targets to be the same length
     assert_eq!(inputs.len(), targets.len());
+
+    // post-process the targets to ensure the target width value is enforced
+    if target_width > 1 {
+        let left = target_width / 2 - 1;
+        let right = target_width / 2;
+        let indices: Vec<usize> = targets
+            .iter()
+            .enumerate()
+            .filter_map(|(i, x)| if x.is_some() { Some(i) } else { None })
+            .collect();
+
+        indices.iter().for_each(|i| {
+            let l = (i - left).max(0);
+            let r = (i + right).min(targets.len() - 1);
+            for j in l..=r {
+                targets[j] = targets[*i].clone();
+            }
+        });
+    }
 
     Ok((inputs, targets))
 }

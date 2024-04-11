@@ -4,7 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::guier::Gui;
+use crate::{data::get_model_metadata, guier::Gui};
 use crate::{data::list_models, oscutil, reservoir::Reservoir};
 use ndarray::Array1;
 
@@ -54,9 +54,12 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
 
     let mut gui = Gui::new("Neuroner");
     let mut output = 0.0;
-    gui.add_row("output", output);
+    gui.add_graph("output", 0.0, 1.0);
     gui.show();
 
+    // get the input width
+    let metadata = get_model_metadata(&model)?;
+    let input_width = metadata.width;
     let mut input_steps_remaining = 0;
 
     // main loop
@@ -66,8 +69,7 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
         // input zero on non-inputs, 1 on inputs
         let mut input = Array1::zeros(nw.inputs);
         if midi_in.recv_bytes(zmq::DONTWAIT).is_ok() {
-            // HACK: this parameter is controlled by the training input pulse width...
-            input_steps_remaining = 20;
+            input_steps_remaining = input_width;
         }
 
         if input_steps_remaining > 0 {

@@ -28,8 +28,6 @@ pub struct Reservoir {
     weights_res_res: Array2<f64>,
     /// sparse matrix representation (res -> res)
     weights_rr_sparse: Option<sprs::CsMat<f64>>,
-    /// Cholesky decomposition of the resonant weights
-    // chol_res_res:
     /// output feedback weights (output -> reservoir)
     weights_out_res: Array2<f64>,
     /// output weights (reservoir -> output)
@@ -286,6 +284,11 @@ impl ReservoirBuilder {
         self.leak_rate(metadata.leak_rate)
     }
 
+    pub fn activation(mut self, activation: Activation) -> Self {
+        self.0.activation = activation;
+        self
+    }
+
     pub fn leak_rate(mut self, lambda: f64) -> Self {
         self.0.leak_rate = lambda;
         self
@@ -321,7 +324,7 @@ impl Reservoir {
             visible_count: 0,
             inputs: 0,
             outputs: 0,
-            activation: Activation::Tanh,
+            activation: Activation::Linear,
             leak_rate: 0.95,
             learning_rate: 0.1,
             warm_up: 50,
@@ -349,6 +352,7 @@ impl Reservoir {
             .learning_rate(args.learning_rate)
             .leak_rate(args.leak_rate)
             .regularization(args.regularization)
+            .activation(args.activation.clone())
             .build();
 
         if args.npy.is_none() {

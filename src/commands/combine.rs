@@ -50,7 +50,7 @@ fn drum_robot_loop(
     let beat_send = Arc::new(AtomicBool::new(false));
 
     // start the output stream
-    let _stream = robot::start(Arc::clone(&beat_send), WaveType::Sine(750.0, 0.05));
+    let _stream = robot::start(Arc::clone(&beat_send), WaveType::Pulse(0.3));
 
     // wait for the first metronome signal
     let mut metro = metro_rx.recv()?;
@@ -164,10 +164,12 @@ fn drum_loop(
     }
 }
 
+// TODO: make every peak audible somehow
 fn map_model_to_cc(
     model_output: f32,
     min: &mut f32,
     max: &mut f32,
+    max_max: f32,
     cc_range: u8,
     cc_offset: u8,
     non_negative: bool,
@@ -180,10 +182,17 @@ fn map_model_to_cc(
         }
     } else if model_output > *max {
         *max = model_output;
+        if *max > max_max {
+            *max = max_max;
+        }
     }
 
     let model_range = *max - *min;
-    let model_output_normalized = (model_output - *min) / model_range;
+    let mut model_output_normalized = (model_output - *min) / model_range;
+    model_output_normalized = model_output_normalized.min(1.0).max(0.0);
+    // emphasize high outputs (peaks)
+    model_output_normalized = model_output_normalized.powf(2.0);
+
     (model_output_normalized * f32::from(cc_range)) as u8 + cc_offset
 }
 
@@ -213,6 +222,8 @@ fn cc_loop(
             model_output,
             &mut model_min,
             &mut model_max,
+            // HACK: tmp
+            40.0,
             cc_args.width.get(),
             cc_args.offset,
             cc_args.non_negative,

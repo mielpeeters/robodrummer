@@ -120,7 +120,13 @@ pub fn train(args: super::TrainArgs) -> Result<(), Box<dyn Error>> {
         None => None,
     };
 
-    let (inputs, targets) = load_train_data(&args.data, args.timestep, args.width, shift)?;
+    let (inputs, targets) = load_train_data(
+        &args.data,
+        args.timestep,
+        args.width,
+        args.target_width,
+        shift,
+    )?;
 
     // get data and perform splits
     let train_len = (inputs.len() as f64 * args.split) as usize;

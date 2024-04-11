@@ -23,6 +23,8 @@ pub use midi_broker::broke;
 pub use run::run;
 pub use train::train;
 
+use crate::activation::Activation;
+
 const METRONOME_PORT: u16 = 5432;
 const FEEL_PORT: u16 = 4321;
 const MIDI_PORT: u16 = 6543;
@@ -90,6 +92,10 @@ pub struct TrainArgs {
     #[arg(long, default_value_t = 30)]
     pub width: usize,
 
+    /// The width of a target value
+    #[arg(long = "tw", default_value_t = 1)]
+    pub target_width: usize,
+
     /// Training step: learning rate
     #[arg(short, long = "rate", default_value_t = 0.05)]
     pub learning_rate: f64,
@@ -153,6 +159,10 @@ pub struct TrainArgs {
     /// The train update that's used for offline training
     #[arg(long, default_value = "inv", value_enum)]
     pub mode: TrainMode,
+
+    /// The activation function to use
+    #[arg(long = "act", default_value = "tanh", value_enum)]
+    pub activation: Activation,
 }
 
 #[derive(ValueEnum, Debug, Clone, Serialize, Deserialize, Default)]
@@ -160,6 +170,15 @@ pub enum TrainMode {
     #[default]
     Inv,
     Grad,
+}
+
+impl Display for TrainMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TrainMode::Inv => write!(f, "pseudo inverse"),
+            TrainMode::Grad => write!(f, "MSE gradient descent"),
+        }
+    }
 }
 
 nest! {
@@ -213,6 +232,16 @@ nest! {
 impl Default for RhythmAlgorithm {
     fn default() -> Self {
         RhythmAlgorithm::Euclidean(EucledeanArgs::default())
+    }
+}
+
+impl Display for RhythmAlgorithm {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RhythmAlgorithm::Euclidean(_) => write!(f, "Euclidean"),
+            RhythmAlgorithm::NPDAG(_) => write!(f, "NP-DAG"),
+            RhythmAlgorithm::PolyEuclidean(_) => write!(f, "Poly Euclidean"),
+        }
     }
 }
 

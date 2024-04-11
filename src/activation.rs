@@ -2,13 +2,16 @@
   This module defines and implements the available activation functions.
 */
 
+use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, ValueEnum, Default, Debug)]
 pub enum Activation {
+    #[default]
+    Tanh,
     ReLu,
     Sigmoid,
-    Tanh,
+    Linear,
 }
 
 impl Activation {
@@ -17,6 +20,7 @@ impl Activation {
             Activation::ReLu => relu(input),
             Activation::Sigmoid => sigmoid(input),
             Activation::Tanh => tanh(input),
+            Activation::Linear => input,
         }
     }
 }
