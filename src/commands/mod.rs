@@ -8,6 +8,7 @@ mod gendata;
 mod midi_broker;
 mod run;
 mod train;
+mod tui;
 
 use std::{fmt::Display, num::NonZeroU8};
 
@@ -22,6 +23,7 @@ pub use gendata::gendata;
 pub use midi_broker::broke;
 pub use run::run;
 pub use train::train;
+pub use tui::tui;
 
 use crate::activation::Activation;
 
@@ -45,6 +47,7 @@ pub enum Command {
     Completions(CompletionsArgs),
     MidiBroker(MidiBrokerArgs),
     Combine(CombinerArgs),
+    Tui(TuiArgs),
 }
 
 #[derive(Args, Debug)]
@@ -433,3 +436,6 @@ pub struct ArpeggioArgs {
     #[arg(short, long, default_value_t = 0.5)]
     pub duration: f32,
 }
+
+#[derive(Args, Debug)]
+pub struct TuiArgs {}
