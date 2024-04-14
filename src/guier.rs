@@ -102,6 +102,22 @@ impl Graph {
         }
     }
 
+    pub fn replace(&mut self, values: &[f32]) {
+        // self.min = (*values
+        //     .iter()
+        //     .min_by(|a, b| a.partial_cmp(b).unwrap())
+        //     .unwrap())
+        // .into();
+        // self.max = (*values
+        //     .iter()
+        //     .max_by(|a, b| a.partial_cmp(b).unwrap())
+        //     .unwrap())
+        // .into();
+        self.max = 2.0;
+        self.min = -0.5;
+        self.history = values.iter().map(|v| *v as f64).collect();
+    }
+
     pub fn show(&self) {
         println!("{}:", self.description);
         let step_size = (self.max - self.min) / GRAPH_HEIGHT as f64;
@@ -109,15 +125,17 @@ impl Graph {
         for i in (0..GRAPH_HEIGHT).rev() {
             let y = self.min + (self.max - self.min) * i as f64 / GRAPH_HEIGHT as f64;
             let mut line = String::new();
-            for x in 0..GRAPH_WIDTH {
-                let x = self.history.len() - GRAPH_WIDTH + x;
-                if x < self.history.len() {
-                    let value = self.history[x];
-                    if value < y && value > y - step_size {
-                        line.push('_');
+            for x in 0..self.history.len() {
+                let value = self.history[x];
+                if value < y && value > y - step_size {
+                    let chr = if x == (self.history.len() - 1) {
+                        '*'
                     } else {
-                        line.push(' ');
-                    }
+                        '_'
+                    };
+                    line.push(chr);
+                } else {
+                    line.push(' ');
                 }
             }
             println!("{}", line);
@@ -158,6 +176,16 @@ impl Gui {
         for row in &mut self.rows {
             if row.description() == description {
                 row.update(value);
+            }
+        }
+    }
+
+    pub fn replace_graph(&mut self, description: &str, values: &[f32]) {
+        for row in &mut self.rows {
+            if row.description() == description {
+                if let Row::Graph(g) = row {
+                    g.replace(values);
+                }
             }
         }
     }

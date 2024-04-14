@@ -17,6 +17,48 @@ use midi_control::{ControlEvent, KeyEvent, MidiMessage, MidiMessageSend};
 use super::{ArpeggioArgs, CCArgs, CombinerArgs};
 use crate::arpeggio::Arpeggio;
 
+pub struct NetworkPeriod {
+    pub length: usize,
+    pub activity: Vec<f32>,
+    // the leak rate of the period adjustment
+    pub leak_rate: f32,
+    init: usize,
+}
+
+impl NetworkPeriod {
+    pub fn new(length: usize, leak_rate: f32) -> Self {
+        Self {
+            length,
+            activity: vec![0.0; length],
+            leak_rate,
+            init: 0,
+        }
+    }
+
+    /// Update the activity of the network at a certain phase
+    ///
+    /// # Arguments
+    /// * `phase` - the phase of the network
+    /// * `value` - the value of the network at the phase
+    pub fn update(&mut self, phase: f64, value: f32) {
+        let idx = (phase * self.length as f64) as usize;
+        let val = self.activity.get_mut(idx).unwrap();
+        let lr = match self.init >= self.length {
+            true => {
+                self.init += 1;
+                1.0
+            }
+            false => self.leak_rate,
+        };
+        *val = (1.0 - lr) * *val + lr * value;
+    }
+
+    pub fn get(&self, phase: f64) -> f32 {
+        let idx = (phase * self.length as f64) as usize;
+        *self.activity.get(idx).unwrap()
+    }
+}
+
 /// Non-blocking receiving calls to the receiver until the last value has been retreived
 fn get_last_sent<T>(rx: &mpsc::Receiver<T>) -> Option<T> {
     let mut last = None;
@@ -180,8 +222,8 @@ fn map_model_to_cc(
         if non_negative {
             *min = min.max(0.0);
         }
-    } else if model_output > *max {
-        *max = model_output;
+    } else if model_output * 0.7 > *max {
+        *max = model_output * 0.7;
         if *max > max_max {
             *max = max_max;
         }
@@ -191,7 +233,7 @@ fn map_model_to_cc(
     let mut model_output_normalized = (model_output - *min) / model_range;
     model_output_normalized = model_output_normalized.min(1.0).max(0.0);
     // emphasize high outputs (peaks)
-    model_output_normalized = model_output_normalized.powf(2.0);
+    model_output_normalized = model_output_normalized.powf(0.5);
 
     (model_output_normalized * f32::from(cc_range)) as u8 + cc_offset
 }
@@ -201,13 +243,16 @@ fn cc_loop(
     cc_args: CCArgs,
     mut gui: Gui,
     nw_rx: mpsc::Receiver<f32>,
+    metro_rx: mpsc::Receiver<f64>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // connect to the midi output
     let mut midi_out = midier::create_midi_output_and_connect()?;
 
     // GUI output
     gui.add_row("cc target", cc_args.cc);
-    gui.add_row("value", 0);
+    gui.add_row("period", 0.0);
+    gui.add_row("phase", 0.0);
+    gui.add_graph("value", 0.0, 1.0);
 
     let mut cc_out;
     let mut model_output = 0.0;
@@ -215,11 +260,29 @@ fn cc_loop(
     let mut model_min = 0.0;
     let mut model_max = 0.0;
 
+    // get period time from metronome
+    let mut period = metro_rx.recv()? * 4.0;
+
+    // create network period
+    // TODO: adjust the first value using some testing
+    // probably should be lower
+    let mut nw_periodic = NetworkPeriod::new(40, 0.15);
+
+    let mut start: Instant = Instant::now();
+    let mut phase = 0.0;
+
     loop {
+        let passed_time = (Instant::now() - start).as_secs_f64();
+        start = Instant::now();
+        phase += passed_time / period;
+        phase %= 1.0;
         model_output = get_last_sent(&nw_rx).unwrap_or(model_output);
+        nw_periodic.update(phase, model_output);
+
+        let val = nw_periodic.get(phase);
 
         cc_out = map_model_to_cc(
-            model_output,
+            val,
             &mut model_min,
             &mut model_max,
             // HACK: tmp
@@ -243,7 +306,15 @@ fn cc_loop(
             log::error!("Error sending midi message: {}", e);
         };
 
+        let rcv_period = get_last_sent(&metro_rx);
+        if let Some(new_period) = rcv_period {
+            period = new_period * 4.0;
+        }
+
         gui.update_row("value", &cc_out);
+        gui.update_row("period", &period);
+        gui.update_row("phase", &phase);
+        gui.replace_graph("value", &nw_periodic.activity);
         gui.show();
 
         sleep(Duration::from_millis(10));
@@ -391,6 +462,6 @@ pub fn combine(args: CombinerArgs) -> Result<(), Box<dyn std::error::Error>> {
         super::OutputMode::Arpeggio(arp_args) => {
             arpeggio_loop(args, arp_args, gui, nw_rx, wait_rx, context)
         }
-        super::OutputMode::CC(cc_args) => cc_loop(args, cc_args, gui, nw_rx),
+        super::OutputMode::CC(cc_args) => cc_loop(args, cc_args, gui, nw_rx, wait_rx),
     }
 }
