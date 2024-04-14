@@ -17,7 +17,7 @@ use super::GenerateDataArgs;
 /// A Rhythmic Pattern is just a collection of onsets and silent rests
 ///
 /// This is modeled as a simple vector of booleans
-pub struct RhythmPattern(Vec<bool>);
+pub struct RhythmPattern(pub Vec<bool>);
 
 impl RhythmPattern {
     pub fn new(n: usize) -> Self {
@@ -135,19 +135,81 @@ fn chebyshev(density: f64, offset: f64) -> Box<dyn Fn(f64) -> Vec<f64>> {
     Box::new(func)
 }
 
-fn euclidean(n: usize, k: usize) -> RhythmPattern {
-    let mut pattern = RhythmPattern::new(n);
-    let real_step = n as f64 / k as f64;
+struct Sequence {
+    sequence: Vec<Vec<bool>>,
+    n: usize,
+    k: usize,
+}
 
-    log::info!("Generating Euclidean rhythm with n = {} and k = {}", n, k);
-    log::info!("Real step: {}", real_step);
-    for i in 0..k {
-        let index = (real_step * i as f64).ceil() as usize;
-        log::info!("Setting index {} to true", index);
-        pattern[index] = true;
+impl Sequence {
+    fn new(n: usize, k: usize) -> Self {
+        let mut sequence = vec![];
+
+        for i in 0..n {
+            sequence.push(vec![i < k]);
+        }
+
+        Self { sequence, n, k }
     }
 
-    pattern
+    fn move_last(&mut self, to_move: usize) {
+        log::info!("Moving {} subsequences", to_move);
+        log::info!("Old sequence: {:?}", self.sequence);
+
+        for i in 0..to_move {
+            let moved_seq = self.sequence.remove(self.sequence.len() - 1);
+            self.sequence
+                .get_mut(i)
+                .unwrap()
+                .extend_from_slice(&moved_seq);
+            log::info!("Moved subsequence: {:?}", moved_seq);
+            log::info!("New sequence: {:?}", self.sequence);
+        }
+
+        // update the n and k values
+        self.n -= to_move;
+        self.k = to_move;
+    }
+
+    /// Returns false if the sequence is done
+    fn euclidean_step(&mut self) -> bool {
+        let r = self.n % self.k;
+        let q = self.n / self.k;
+
+        log::info!("n: {}, k: {}, q: {}, r: {}", self.n, self.k, q, r);
+
+        // if the quotient is not 1, we need to move k
+        let to_move = if q > 1 {
+            self.k
+        } else if r > 1 {
+            r
+        } else {
+            return false;
+        };
+
+        // move the last to_move subsequences to the back of the first to_move subsequences
+        self.move_last(to_move);
+
+        true
+    }
+
+    fn as_pattern(&mut self, n: usize) -> RhythmPattern {
+        while self.euclidean_step() {}
+
+        let mut pattern = RhythmPattern::new(n);
+
+        pattern.0 = self.sequence.iter().flatten().copied().collect();
+
+        pattern
+    }
+}
+
+fn euclidean(n: usize, k: usize) -> RhythmPattern {
+    log::info!("Generating Euclidean rhythm with n = {} and k = {}", n, k);
+
+    let mut sequence = Sequence::new(n, k);
+
+    sequence.as_pattern(n)
 }
 
 fn generate_input_times(mspb: f64, var: f64, duration: f64) -> Vec<f64> {
