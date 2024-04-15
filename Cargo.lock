@@ -1174,17 +1174,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "midier"
-version = "0.1.0"
-dependencies = [
- "csv",
- "make-csv",
- "midi-control",
- "midir",
- "text_io",
-]
-
-[[package]]
 name = "midir"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1363,7 +1352,6 @@ dependencies = [
  "log",
  "make-csv",
  "midi-control",
- "midier",
  "midir",
  "ndarray",
  "ndarray-linalg",

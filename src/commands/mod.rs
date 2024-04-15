@@ -7,6 +7,7 @@ mod completions;
 mod gendata;
 mod midi_broker;
 mod run;
+mod test_robot;
 mod train;
 mod tui;
 
@@ -22,6 +23,7 @@ pub use completions::update_completions;
 pub use gendata::gendata;
 pub use midi_broker::broke;
 pub use run::run;
+pub use test_robot::robot;
 pub use train::train;
 pub use tui::tui;
 
@@ -48,6 +50,7 @@ pub enum Command {
     MidiBroker(MidiBrokerArgs),
     Combine(CombinerArgs),
     Tui(TuiArgs),
+    Robot(RobotArgs),
 }
 
 #[derive(Args, Debug)]
@@ -439,3 +442,16 @@ pub struct ArpeggioArgs {
 
 #[derive(Args, Debug)]
 pub struct TuiArgs {}
+
+#[derive(Args, Debug)]
+pub struct RobotArgs {
+    /// The test to run
+    #[command(subcommand)]
+    pub command: RobotCommand,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum RobotCommand {
+    Sweep,
+    WaveType,
+}

@@ -1,5 +1,7 @@
 use std::sync::mpsc;
 
+use crate::midier;
+
 use super::MidiBrokerArgs;
 use midi_control::{KeyEvent, MidiMessage, MidiNote};
 
@@ -120,22 +122,7 @@ pub fn broke(args: MidiBrokerArgs) -> Result<(), Box<dyn std::error::Error>> {
     publisher.bind(&format!("tcp://*:{}", args.port))?;
 
     // set up midi input connection
-    let (tx, rx) = mpsc::channel();
-    let channel = args.channel;
-    let _midi_in = midier::create_midi_input_and_connect(
-        move |stamp, msg, tx_local| {
-            let midimsg = MidiMessage::from(msg);
-            if let MidiMessage::NoteOn(c, k) = midimsg {
-                if let Some(channel) = channel {
-                    if c != (channel - 1).into() {
-                        return;
-                    }
-                }
-                tx_local.send((stamp, k)).unwrap()
-            };
-        },
-        tx.clone(),
-    );
+    let rx = midier::setup_midi_receiver(args.channel)?;
 
     match args.mode {
         super::BrokerMode::Single => single(rx, publisher),

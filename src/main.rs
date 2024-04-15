@@ -6,6 +6,7 @@ use clap::Parser;
 use neuroner::commands::broke;
 use neuroner::commands::combine;
 use neuroner::commands::gendata;
+use neuroner::commands::robot;
 use neuroner::commands::run;
 use neuroner::commands::train;
 use neuroner::commands::tui;
@@ -25,5 +26,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         neuroner::commands::Command::MidiBroker(m) => broke(m),
         neuroner::commands::Command::Combine(c) => combine(c),
         neuroner::commands::Command::Tui(t) => tui(t),
+        neuroner::commands::Command::Robot(r) => robot(r),
     }
 }

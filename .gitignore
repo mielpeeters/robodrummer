@@ -4,3 +4,4 @@ int_states.csv
 # flamegraph
 perf.data
 flame.svg
+data/

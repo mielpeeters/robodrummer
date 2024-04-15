@@ -15,7 +15,6 @@ cc = "1.0.83"
 hound = "3.5.1"
 
 [dependencies]
-midier = { version = "0.1.0", path = "../midier" }
 ndarray = { version = "0.15.6", features = ["blas", "serde"] }
 blas-src = { version = "0.10", default-features = false, features = [
     "openblas",

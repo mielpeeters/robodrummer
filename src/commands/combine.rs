@@ -10,6 +10,7 @@ use std::{
 
 use crate::{
     guier::Gui,
+    midier,
     robot::{self, WaveType},
 };
 use midi_control::{ControlEvent, KeyEvent, MidiMessage, MidiMessageSend};
