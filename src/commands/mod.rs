@@ -9,7 +9,6 @@ mod midi_broker;
 mod run;
 mod test_robot;
 mod train;
-mod tui;
 
 use std::{fmt::Display, num::NonZeroU8};
 
@@ -18,6 +17,7 @@ use clap_complete::Shell;
 use nestify::nest;
 use serde::{Deserialize, Serialize};
 
+pub use crate::tui::start_tui as tui;
 pub use combine::combine;
 pub use completions::update_completions;
 pub use gendata::gendata;
@@ -25,7 +25,6 @@ pub use midi_broker::broke;
 pub use run::run;
 pub use test_robot::robot;
 pub use train::train;
-pub use tui::tui;
 
 use crate::activation::Activation;
 
@@ -302,7 +301,7 @@ pub struct CompletionsArgs {
 }
 
 nest! {
-    #[derive(Args, Debug)]
+    #[derive(Args, Debug, Default)]
     pub struct MidiBrokerArgs {
         /// The port on which to publish midi messages
         #[arg(short, long, default_value_t = MIDI_PORT)]
@@ -311,8 +310,9 @@ nest! {
         /// The mode to operate on
         #[arg(short, long, default_value = "single", value_enum)]
         pub mode:
-            #[derive(ValueEnum, Clone, Debug)]
+            #[derive(ValueEnum, Clone, Debug, Default)]
             pub enum BrokerMode {
+                #[default]
                 Single,
                 Chord,
             },
@@ -324,6 +324,21 @@ nest! {
         /// The channel to filter inputs on
         #[arg(long = "ch")]
         pub channel: Option<u8>,
+    }
+}
+
+impl MidiBrokerArgs {
+    pub fn channel_str(&self) -> String {
+        self.channel
+            .map(|c| format!("channel {}", c))
+            .unwrap_or("all channels".into())
+    }
+
+    pub fn mode_str(&self) -> String {
+        match self.mode {
+            BrokerMode::Single => "single notes".into(),
+            BrokerMode::Chord => format!("chords of size {}", self.chord_size),
+        }
     }
 }
 

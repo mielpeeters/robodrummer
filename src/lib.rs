@@ -92,3 +92,5 @@ pub mod reservoir;
 pub mod robot;
 pub mod series;
 pub mod trainutil;
+mod tui;
+
