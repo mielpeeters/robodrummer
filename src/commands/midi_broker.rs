@@ -3,7 +3,7 @@ use std::sync::mpsc;
 use crate::midier;
 
 use super::MidiBrokerArgs;
-use midi_control::{KeyEvent, MidiMessage, MidiNote};
+use midi_control::{KeyEvent, MidiNote};
 
 const FILTER_SIZE: usize = 8;
 

@@ -3,7 +3,12 @@ mod errors;
 use std::{
     error::Error,
     io::{stdin, stdout, Write},
-    sync::mpsc::{self, Receiver},
+    sync::{
+        atomic::AtomicBool,
+        mpsc::{self, Receiver},
+        Arc,
+    },
+    thread,
 };
 
 use midi_control::{KeyEvent, MidiMessage, MidiMessageSend};
@@ -101,21 +106,37 @@ pub fn send_note(conn: &mut midir::MidiOutputConnection, channel: u32, note: u8,
 pub fn setup_midi_receiver(
     channel: Option<u8>,
 ) -> Result<Receiver<(u64, KeyEvent)>, Box<dyn Error>> {
+    let done = Arc::new(AtomicBool::new(false));
+    let done_clone = done.clone();
     let (tx, rx) = mpsc::channel();
-    let _midi_in = create_midi_input_and_connect(
-        move |stamp, msg, tx_local| {
-            let midimsg = MidiMessage::from(msg);
-            if let MidiMessage::NoteOn(c, k) = midimsg {
-                if let Some(channel) = channel {
-                    if c != (channel - 1).into() {
-                        return;
+    thread::spawn(move || {
+        let _midi_in = create_midi_input_and_connect(
+            move |stamp, msg, tx_local| {
+                let midimsg = MidiMessage::from(msg);
+                if let MidiMessage::NoteOn(c, k) = midimsg {
+                    if let Some(channel) = channel {
+                        if c != (channel - 1).into() {
+                            return;
+                        }
                     }
-                }
-                tx_local.send((stamp, k)).unwrap()
-            };
-        },
-        tx.clone(),
-    );
+                    tx_local.send((stamp, k)).unwrap()
+                };
+            },
+            tx.clone(),
+        )
+        .unwrap();
+
+        done_clone.store(true, std::sync::atomic::Ordering::Relaxed);
+
+        loop {
+            // keep the thread (thus the midi connection) alive
+            thread::sleep(std::time::Duration::from_millis(100000));
+        }
+    });
+
+    while !done.load(std::sync::atomic::Ordering::Relaxed) {
+        thread::sleep(std::time::Duration::from_millis(100));
+    }
 
     Ok(rx)
 }

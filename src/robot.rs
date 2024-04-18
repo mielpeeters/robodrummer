@@ -9,7 +9,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     },
-    thread::sleep,
+    thread::{sleep, JoinHandle},
     time::Duration,
 };
 
@@ -19,11 +19,18 @@ use cpal::{
 };
 
 /// Wave types should be able to generate a vector of samples
+#[derive(Debug, Clone, Copy)]
 pub enum WaveType {
     /// A pulse wave with given width in seconds
     Pulse(f32),
     /// A sine wave with given frequency and width
     Sine(f32, f32),
+    /// A single sawtooth with given width
+    Saw(f32),
+    /// A parabolic sloping descent
+    Slope(f32),
+    /// A saw that slowly goes up too
+    SlowSaw(f32),
 }
 
 impl WaveType {
@@ -33,13 +40,35 @@ impl WaveType {
             WaveType::Pulse(w) => {
                 let width = (sample_rate * w) as usize;
                 for _ in 0..width {
-                    res.push_back(1.0_f32);
+                    res.push_back(1.0);
                 }
             }
             WaveType::Sine(f, w) => {
                 let width = (sample_rate * w) as usize;
                 for i in 0..width {
                     res.push_back((2.0 * PI * f * i as f32 / sample_rate).sin());
+                }
+            }
+            WaveType::Saw(w) => {
+                let width = (sample_rate * w) as usize;
+                for i in 0..width {
+                    res.push_back(1.0 - (i as f32 / width as f32))
+                }
+            }
+            WaveType::SlowSaw(w) => {
+                let width = (sample_rate * w) as usize;
+                let fifth = width / 5;
+                for i in 0..fifth {
+                    res.push_back(i as f32 / fifth as f32)
+                }
+                for i in 0..width - fifth {
+                    res.push_back(1.0 - (i as f32 / (width - fifth) as f32))
+                }
+            }
+            WaveType::Slope(w) => {
+                let width = (sample_rate * w) as usize;
+                for i in 0..width {
+                    res.push_back(1.0 - (i as f32 / width as f32).powf(3.0))
                 }
             }
         }
@@ -54,7 +83,10 @@ impl WaveType {
 ///
 /// # Arguments
 /// - `send_beat` : A boolean flag which indicates a beat should be sent
-pub fn start(send_beat: Arc<AtomicBool>, wave: WaveType) -> (Stream, SupportedStreamConfig) {
+pub fn start(
+    send_beat: Arc<AtomicBool>,
+    wave: WaveType,
+) -> (Stream, SupportedStreamConfig, JoinHandle<()>) {
     let host = cpal::host_from_id(
         cpal::available_hosts()
             .into_iter()
@@ -95,7 +127,7 @@ pub fn start(send_beat: Arc<AtomicBool>, wave: WaveType) -> (Stream, SupportedSt
     );
 
     // start the thread that receives the beat signal
-    let _handle = std::thread::spawn(move || loop {
+    let handle = std::thread::spawn(move || loop {
         if send_beat.load(Ordering::Relaxed) {
             let samples = wave.generate(sample_rate);
             let mut queue = queue.lock().unwrap();
@@ -108,5 +140,5 @@ pub fn start(send_beat: Arc<AtomicBool>, wave: WaveType) -> (Stream, SupportedSt
         sleep(Duration::from_millis(1));
     });
 
-    (out_stream.unwrap(), config)
+    (out_stream.unwrap(), config, handle)
 }
