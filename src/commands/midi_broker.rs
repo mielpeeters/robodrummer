@@ -1,6 +1,9 @@
-use std::sync::mpsc;
+use std::sync::mpsc::{self, Sender};
 
-use crate::midier;
+use crate::{
+    midier,
+    tui::{app::TuiMessage, messages::MidiTuiMessage},
+};
 
 use super::MidiBrokerArgs;
 use midi_control::{KeyEvent, MidiNote};
@@ -78,6 +81,7 @@ impl<const L: usize> MidiFilter<L> {
 fn single(
     rx: mpsc::Receiver<(u64, KeyEvent)>,
     publisher: zmq::Socket,
+    tui_sender: Option<Sender<TuiMessage<MidiTuiMessage>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut midi_filter = MidiFilter::<1>::new(1, 100_000);
 
@@ -88,15 +92,28 @@ fn single(
         midi_filter.add(timestamp, keyevent);
 
         if let Some(chord) = midi_filter.chord_played() {
-            publisher.send(chord, 0)?;
+            publisher.send(chord.clone(), 0)?;
+            // update the TUI
+            if let Some(sender) = &tui_sender {
+                if sender
+                    .send(MidiTuiMessage::MidiNotes(chord).into())
+                    .is_err()
+                {
+                    // connection is not live anymore, close this thread
+                    break;
+                }
+            }
         }
     }
+
+    Ok(())
 }
 
 fn chord(
     rx: mpsc::Receiver<(u64, KeyEvent)>,
     publisher: zmq::Socket,
     chord_size: usize,
+    tui_sender: Option<Sender<TuiMessage<MidiTuiMessage>>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     assert!(chord_size < FILTER_SIZE);
     let mut midi_filter = MidiFilter::<FILTER_SIZE>::new(chord_size, 100_000);
@@ -109,13 +126,27 @@ fn chord(
 
         if let Some(chord) = midi_filter.chord_played() {
             log::debug!("send a chord: {:?}", chord);
-            publisher.send(chord, 0)?;
+            publisher.send(chord.clone(), 0)?;
+            if let Some(sender) = &tui_sender {
+                if sender
+                    .send(MidiTuiMessage::MidiNotes(chord).into())
+                    .is_err()
+                {
+                    // connection is not live anymore, close this thread
+                    break;
+                }
+            }
         }
     }
+
+    Ok(())
 }
 
 /// handle midi incomping messages
-pub fn broke(args: MidiBrokerArgs) -> Result<(), Box<dyn std::error::Error>> {
+pub fn broke(
+    args: MidiBrokerArgs,
+    tui_sender: Option<Sender<TuiMessage<MidiTuiMessage>>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     // set up zmq pubish channel
     let context = zmq::Context::new();
     let publisher = context.socket(zmq::PUB)?;
@@ -125,7 +156,7 @@ pub fn broke(args: MidiBrokerArgs) -> Result<(), Box<dyn std::error::Error>> {
     let rx = midier::setup_midi_receiver(args.channel)?;
 
     match args.mode {
-        super::BrokerMode::Single => single(rx, publisher),
-        super::BrokerMode::Chord => chord(rx, publisher, args.chord_size),
+        super::BrokerMode::Single => single(rx, publisher, tui_sender),
+        super::BrokerMode::Chord => chord(rx, publisher, args.chord_size, tui_sender),
     }
 }
