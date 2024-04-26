@@ -1,6 +1,6 @@
 use std::{
     error::Error,
-    sync::{atomic::AtomicBool, mpsc::Receiver, Arc},
+    sync::{atomic::AtomicBool, Arc},
     thread::sleep,
     time::{Duration, Instant},
 };
@@ -10,6 +10,7 @@ use make_csv::{csv_entry, csv_start, csv_stop};
 use crate::{
     midier,
     robot::{self, WaveType},
+    utils::get_last_sent_timeout,
 };
 
 use super::{RobotArgs, RobotCommand};
@@ -20,34 +21,9 @@ const BEAT_INCR: Duration = Duration::from_micros(12500);
 const MEASUREMENT_COUNT: u32 = 2;
 const WAVE_TEST_COUNT: u32 = 20;
 
-/// Non-blocking receiving calls to the receiver until the last value has been retreived
-#[allow(dead_code)]
-fn get_last_sent<T>(rx: &Receiver<T>) -> Option<T> {
-    let mut last = None;
-    while let Ok(val) = rx.try_recv() {
-        last = Some(val);
-    }
-    last
-}
-
-/// Non-blocking receiving calls to the receiver until the last value has been retreived
-fn get_last_sent_timeout<T>(rx: &Receiver<T>, timeout: Duration) -> Option<T>
-where
-    T: std::fmt::Debug,
-{
-    let mut last = None;
-    if let Ok(m) = rx.recv_timeout(timeout) {
-        last = Some(m);
-        while let Ok(val) = rx.try_recv() {
-            last = Some(val);
-        }
-    }
-    last
-}
-
 pub fn sweep() -> Result<(), Box<dyn Error>> {
     // set up incoming MIDI connection (robot's output) (listen for any channel)
-    let rx = midier::setup_midi_receiver(None)?;
+    let rx = midier::setup_midi_receiver(None, None)?;
 
     // set up outgoing audio connection
     let beat = Arc::new(AtomicBool::new(false));
@@ -111,7 +87,7 @@ pub fn sweep() -> Result<(), Box<dyn Error>> {
 
 pub fn test_waves() -> Result<(), Box<dyn Error>> {
     // set up incoming MIDI connection (robot's output) (listen for any channel)
-    let rx = midier::setup_midi_receiver(None)?;
+    let rx = midier::setup_midi_receiver(None, None)?;
 
     let waves = vec![
         WaveType::Saw(0.15),

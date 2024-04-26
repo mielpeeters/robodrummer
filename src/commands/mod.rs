@@ -52,7 +52,7 @@ pub enum Command {
     Robot(RobotArgs),
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Clone)]
 pub struct RunArgs {
     /// The amount of ms between evaluations
     #[arg(short, long, default_value_t = 2.0)]
@@ -81,6 +81,20 @@ pub struct RunArgs {
     /// Port on which the network output is published using osc
     #[arg(short, long, default_value_t = OSC_PORT)]
     pub osc_port: u16,
+}
+
+impl Default for RunArgs {
+    fn default() -> Self {
+        RunArgs {
+            timestep: 2.0,
+            model: "3_8".into(),
+            list: false,
+            network_port: FEEL_PORT,
+            metronome_port: METRONOME_PORT,
+            midi_port: MIDI_PORT,
+            osc_port: OSC_PORT,
+        }
+    }
 }
 
 #[derive(Args, Debug, Serialize, Deserialize, Default)]
@@ -301,7 +315,7 @@ pub struct CompletionsArgs {
 }
 
 nest! {
-    #[derive(Args, Debug, Default)]
+    #[derive(Args, Debug, Clone)]
     pub struct MidiBrokerArgs {
         /// The port on which to publish midi messages
         #[arg(short, long, default_value_t = MIDI_PORT)]
@@ -324,6 +338,22 @@ nest! {
         /// The channel to filter inputs on
         #[arg(long = "ch")]
         pub channel: Option<u8>,
+
+        /// The device to listen on
+        #[arg(long)]
+        pub device: Option<String>,
+    }
+}
+
+impl Default for MidiBrokerArgs {
+    fn default() -> Self {
+        MidiBrokerArgs {
+            port: MIDI_PORT,
+            mode: BrokerMode::Single,
+            chord_size: 3,
+            channel: None,
+            device: None,
+        }
     }
 }
 

@@ -147,6 +147,7 @@ impl Graph {
 pub struct Gui {
     name: String,
     rows: Vec<Row>,
+    enabled: bool,
 }
 
 impl Gui {
@@ -154,7 +155,12 @@ impl Gui {
         Gui {
             name: name.to_string(),
             rows: Vec::new(),
+            enabled: true,
         }
+    }
+
+    pub fn disable(&mut self) {
+        self.enabled = false;
     }
 
     pub fn add_row<T>(&mut self, description: &str, value: T)
@@ -191,6 +197,9 @@ impl Gui {
     }
 
     pub fn show(&self) {
+        if !self.enabled {
+            return;
+        }
         print!("\x1B[2J");
         println!();
         println!("\x1b[1;92m{}\x1b[0m", self.name);

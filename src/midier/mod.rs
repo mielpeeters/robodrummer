@@ -4,7 +4,7 @@ use std::{
     error::Error,
     io::{stdin, stdout, Write},
     sync::{
-        atomic::AtomicBool,
+        atomic::{AtomicBool, Ordering},
         mpsc::{self, Receiver},
         Arc,
     },
@@ -51,6 +51,7 @@ pub fn create_midi_output_and_connect() -> Result<midir::MidiOutputConnection, e
 pub fn create_midi_input_and_connect<F, T: Send>(
     callback: F,
     data: T,
+    device: Option<String>,
 ) -> Result<midir::MidiInputConnection<T>, errors::MidiError>
 where
     F: FnMut(u64, &[u8], &mut T) + Send + 'static,
@@ -59,24 +60,36 @@ where
         return Err(errors::MidiError::CantCreateMidiIn);
     };
 
-    println!("Available Midi ports to connect to:");
     let ports = midi_in.ports();
-    for (i, port) in ports.iter().enumerate() {
-        println!("{i}:   {}", midi_in.port_name(port).unwrap());
-    }
 
-    let num = ask("Select one: ");
+    let num = if let Some(device) = device {
+        ports
+            .iter()
+            .position(|port| check_midi_device(&midi_in.port_name(port).unwrap(), &device))
+            .ok_or(errors::MidiError::DeviceNotFound(device))?
+    } else {
+        println!("Available Midi ports to connect to:");
+        for (i, port) in ports.iter().enumerate() {
+            println!("\t{i}: {}", midi_in.port_name(port).unwrap());
+        }
+        let res = ask("Select one: ");
+        if res >= ports.len() {
+            return Err(errors::MidiError::PortNotOpen);
+        }
+        res
+    };
 
     let port_in = ports.get(num).unwrap();
-    let name = midi_in.port_name(port_in).unwrap();
 
     let conn_in = midi_in
         .connect(port_in, "midier input port", callback, data)
         .unwrap();
 
-    println!("Connection to {name} is open. Callback will be called on receive.");
-
     Ok(conn_in)
+}
+
+fn check_midi_device(available: &str, device: &str) -> bool {
+    available.to_lowercase().contains(&device.to_lowercase())
 }
 
 // pub fn rcv_signal(conn: &mut midir::MidiInputConnection<>)
@@ -105,12 +118,16 @@ pub fn send_note(conn: &mut midir::MidiOutputConnection, channel: u32, note: u8,
 
 pub fn setup_midi_receiver(
     channel: Option<u8>,
+    device: Option<String>,
 ) -> Result<Receiver<(u64, KeyEvent)>, Box<dyn Error>> {
     let done = Arc::new(AtomicBool::new(false));
     let done_clone = done.clone();
+    let (error_tx, error_rx) = mpsc::channel();
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
-        let _midi_in = create_midi_input_and_connect(
+        let no_connection_left = Arc::new(AtomicBool::new(false));
+        let no_connection_left_clone = no_connection_left.clone();
+        let midi_in = create_midi_input_and_connect(
             move |stamp, msg, tx_local| {
                 let midimsg = MidiMessage::from(msg);
                 if let MidiMessage::NoteOn(c, k) = midimsg {
@@ -119,22 +136,39 @@ pub fn setup_midi_receiver(
                             return;
                         }
                     }
-                    tx_local.send((stamp, k)).unwrap()
+                    if tx_local.send((stamp, k)).is_err() {
+                        no_connection_left_clone.store(true, Ordering::Relaxed)
+                    };
                 };
             },
             tx.clone(),
-        )
-        .unwrap();
+            device,
+        );
 
-        done_clone.store(true, std::sync::atomic::Ordering::Relaxed);
+        if let Err(e) = midi_in {
+            error_tx.send(e).unwrap();
+            return;
+        }
+
+        done_clone.store(true, Ordering::Relaxed);
 
         loop {
+            if no_connection_left.load(Ordering::Relaxed) {
+                // not needed but this shows the purpose
+                drop(midi_in);
+                break;
+            }
             // keep the thread (thus the midi connection) alive
             thread::sleep(std::time::Duration::from_millis(100000));
         }
     });
 
     while !done.load(std::sync::atomic::Ordering::Relaxed) {
+        // maybe an error occurred
+        if let Ok(e) = error_rx.try_recv() {
+            return Err(Box::new(e));
+        }
+
         thread::sleep(std::time::Duration::from_millis(100));
     }
 
@@ -157,6 +191,7 @@ mod tests {
         let conn = create_midi_input_and_connect(
             move |stamp, msg, _| println!("{} -> {:?} (lenth {})", stamp, msg, msg.len()),
             (),
+            None,
         );
 
         assert!(conn.is_ok(), "Connection wasnt correctly created")

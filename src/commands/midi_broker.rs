@@ -1,9 +1,9 @@
-use std::sync::mpsc::{self, Sender};
-
-use crate::{
-    midier,
-    tui::{app::TuiMessage, messages::MidiTuiMessage},
+use std::{
+    sync::mpsc::{self, Sender},
+    time::Duration,
 };
+
+use crate::{midier, tui::messages::MidiTuiMessage};
 
 use super::MidiBrokerArgs;
 use midi_control::{KeyEvent, MidiNote};
@@ -81,24 +81,29 @@ impl<const L: usize> MidiFilter<L> {
 fn single(
     rx: mpsc::Receiver<(u64, KeyEvent)>,
     publisher: zmq::Socket,
-    tui_sender: Option<Sender<TuiMessage<MidiTuiMessage>>>,
+    tui_sender: Option<Sender<MidiTuiMessage>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut midi_filter = MidiFilter::<1>::new(1, 100_000);
 
     loop {
         // wait for incomming midi messages
-        let (timestamp, keyevent) = rx.recv()?;
-
-        midi_filter.add(timestamp, keyevent);
-
-        if let Some(chord) = midi_filter.chord_played() {
-            publisher.send(chord.clone(), 0)?;
-            // update the TUI
+        let received = rx.recv_timeout(Duration::from_millis(100));
+        if let Ok((timestamp, keyevent)) = received {
+            midi_filter.add(timestamp, keyevent);
+            if let Some(chord) = midi_filter.chord_played() {
+                publisher.send(chord.clone(), 0)?;
+                // update the TUI
+                if let Some(sender) = &tui_sender {
+                    if sender.send(MidiTuiMessage::MidiNotes(chord)).is_err() {
+                        // connection is not live anymore, close this thread
+                        break;
+                    }
+                }
+            }
+        } else {
+            // check if connection is alive
             if let Some(sender) = &tui_sender {
-                if sender
-                    .send(MidiTuiMessage::MidiNotes(chord).into())
-                    .is_err()
-                {
+                if sender.send(MidiTuiMessage::Heartbeat).is_err() {
                     // connection is not live anymore, close this thread
                     break;
                 }
@@ -113,25 +118,30 @@ fn chord(
     rx: mpsc::Receiver<(u64, KeyEvent)>,
     publisher: zmq::Socket,
     chord_size: usize,
-    tui_sender: Option<Sender<TuiMessage<MidiTuiMessage>>>,
+    tui_sender: Option<Sender<MidiTuiMessage>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     assert!(chord_size < FILTER_SIZE);
     let mut midi_filter = MidiFilter::<FILTER_SIZE>::new(chord_size, 100_000);
 
     loop {
         // wait for incomming midi messages
-        let (timestamp, keyevent) = rx.recv()?;
-
-        midi_filter.add(timestamp, keyevent);
-
-        if let Some(chord) = midi_filter.chord_played() {
-            log::debug!("send a chord: {:?}", chord);
-            publisher.send(chord.clone(), 0)?;
+        let received = rx.recv_timeout(Duration::from_millis(100));
+        if let Ok((timestamp, keyevent)) = received {
+            midi_filter.add(timestamp, keyevent);
+            if let Some(chord) = midi_filter.chord_played() {
+                publisher.send(chord.clone(), 0)?;
+                // update the TUI
+                if let Some(sender) = &tui_sender {
+                    if sender.send(MidiTuiMessage::MidiNotes(chord)).is_err() {
+                        // connection is not live anymore, close this thread
+                        break;
+                    }
+                }
+            }
+        } else {
+            // check if connection is alive
             if let Some(sender) = &tui_sender {
-                if sender
-                    .send(MidiTuiMessage::MidiNotes(chord).into())
-                    .is_err()
-                {
+                if sender.send(MidiTuiMessage::Heartbeat).is_err() {
                     // connection is not live anymore, close this thread
                     break;
                 }
@@ -142,10 +152,21 @@ fn chord(
     Ok(())
 }
 
+fn send_if_error<T>(
+    tui_sender: Option<&Sender<MidiTuiMessage>>,
+    value: &Result<T, Box<dyn std::error::Error>>,
+) {
+    if let Err(error) = value {
+        if let Some(sender) = tui_sender {
+            let _ = sender.send(MidiTuiMessage::Error(error.to_string()));
+        }
+    }
+}
+
 /// handle midi incomping messages
 pub fn broke(
     args: MidiBrokerArgs,
-    tui_sender: Option<Sender<TuiMessage<MidiTuiMessage>>>,
+    tui_sender: Option<Sender<MidiTuiMessage>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // set up zmq pubish channel
     let context = zmq::Context::new();
@@ -153,10 +174,31 @@ pub fn broke(
     publisher.bind(&format!("tcp://*:{}", args.port))?;
 
     // set up midi input connection
-    let rx = midier::setup_midi_receiver(args.channel)?;
+    let rx = midier::setup_midi_receiver(args.channel, args.device);
 
-    match args.mode {
-        super::BrokerMode::Single => single(rx, publisher, tui_sender),
-        super::BrokerMode::Chord => chord(rx, publisher, args.chord_size, tui_sender),
+    send_if_error(tui_sender.as_ref(), &rx);
+
+    let rx = match rx {
+        Ok(r) => r,
+        Err(_) => {
+            return Ok(());
+        }
+    };
+
+    let res = match args.mode {
+        super::BrokerMode::Single => single(rx, publisher, tui_sender.clone()),
+        super::BrokerMode::Chord => chord(rx, publisher, args.chord_size, tui_sender.clone()),
+    };
+
+    if let Err(e) = res {
+        if tui_sender.is_some() {
+            // some unwanted error occurred, notify TUI
+            tui_sender
+                .unwrap()
+                .send(MidiTuiMessage::Error(e.to_string()))?;
+        }
     }
+
+    // gracefully close the thread
+    Ok(())
 }

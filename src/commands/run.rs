@@ -1,15 +1,23 @@
 use std::{
     error::Error,
-    sync::{Arc, Mutex},
+    sync::{mpsc::Sender, Arc, Mutex},
     time::{Duration, Instant},
 };
 
-use crate::{data::get_model_metadata, guier::Gui};
-use crate::{data::list_models, oscutil, reservoir::Reservoir};
+use crate::{
+    data::{get_model_metadata, list_models},
+    guier::Gui,
+    oscutil,
+    reservoir::Reservoir,
+    tui::messages::NetworkMessage,
+};
 use ndarray::Array1;
 
 /// run the selected model, determined by the parameters in args.
-pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
+pub fn run(
+    args: super::RunArgs,
+    tui_sender: Option<Sender<NetworkMessage>>,
+) -> Result<(), Box<dyn Error>> {
     // list models if that argument was passed
     if args.list {
         return list_models();
@@ -55,6 +63,9 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
     let mut gui = Gui::new("Neuroner");
     let mut output = 0.0;
     gui.add_graph("output", 0.0, 1.0);
+    if tui_sender.is_some() {
+        gui.disable();
+    }
     gui.show();
 
     // get the input width
@@ -96,6 +107,14 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
             &osc_sock,
         );
 
+        // send output to tui if needed
+        if let Some(sender) = &tui_sender {
+            if sender.send(NetworkMessage::Output(new_output)).is_err() {
+                // stop thread if sender is disconnected
+                break;
+            }
+        }
+
         if new_output != output {
             output = new_output;
             gui.update_row("output", &output);
@@ -115,4 +134,6 @@ pub fn run(args: super::RunArgs) -> Result<(), Box<dyn Error>> {
 
         std::thread::sleep(remaining);
     }
+
+    Ok(())
 }

@@ -46,3 +46,5 @@ nestify = "0.3.3"
 cpal = { version = "0.15.2", features = ["jack"] }
 crossterm = "0.27"
 ratatui = "0.26"
+derive_setters = "0.1.6"
+tui-input = "0.8"

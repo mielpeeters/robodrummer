@@ -20,11 +20,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Arguments::parse();
     match args.command {
         neuroner::commands::Command::Train(t) => train(t),
-        neuroner::commands::Command::Run(r) => run(r),
+        neuroner::commands::Command::Run(r) => run(r, None),
         neuroner::commands::Command::GenerateData(g) => gendata(g),
         neuroner::commands::Command::Completions(c) => update_completions(c),
-        neuroner::commands::Command::MidiBroker(m) => broke(m),
-        neuroner::commands::Command::Combine(c) => combine(c),
+        neuroner::commands::Command::MidiBroker(m) => broke(m, None),
+        neuroner::commands::Command::Combine(c) => combine(c, None),
         neuroner::commands::Command::Tui(t) => tui(t),
         neuroner::commands::Command::Robot(r) => robot(r),
     }

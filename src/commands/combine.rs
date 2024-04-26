@@ -2,7 +2,8 @@ use std::{
     collections::VecDeque,
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc, Arc, Mutex,
+        mpsc::{self, Sender},
+        Arc, Mutex,
     },
     thread::sleep,
     time::{Duration, Instant},
@@ -12,7 +13,9 @@ use crate::{
     guier::Gui,
     midier,
     robot::{self, WaveType},
+    tui::messages::CombinerMessage,
 };
+
 use midi_control::{ControlEvent, KeyEvent, MidiMessage, MidiMessageSend};
 
 use super::{ArpeggioArgs, CCArgs, CombinerArgs};
@@ -83,6 +86,7 @@ fn drum_robot_loop(
     mut gui: Gui,
     metro_rx: mpsc::Receiver<f64>,
     nw_rx: mpsc::Receiver<f32>,
+    tui_sender: Option<Sender<CombinerMessage>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // inform the user of robotic output
     gui.add_row("Robot", "");
@@ -146,8 +150,21 @@ fn drum_robot_loop(
         gui.update_row("Wait Secs", &wait_secs);
         gui.show();
 
+        // send output to tui if needed
+        if let Some(sender) = &tui_sender {
+            if sender
+                .send(CombinerMessage::Output((0.0, nw_output.into())))
+                .is_err()
+            {
+                // stop thread if sender is disconnected
+                break;
+            }
+        }
+
         sleep(Duration::from_secs_f64(wait_secs));
     }
+
+    Ok(())
 }
 
 fn drum_loop(
@@ -156,6 +173,7 @@ fn drum_loop(
     mut gui: Gui,
     wait_rx: mpsc::Receiver<f64>,
     nw_rx: mpsc::Receiver<f32>,
+    tui_sender: Option<Sender<CombinerMessage>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // GUI output
     gui.add_row("BPM", 120);
@@ -163,7 +181,7 @@ fn drum_loop(
 
     // split of into the robotic output if desired
     if let super::DrumOutput::Robot = drum_args.output {
-        return drum_robot_loop(args, drum_args, gui, wait_rx, nw_rx);
+        return drum_robot_loop(args, drum_args, gui, wait_rx, nw_rx, tui_sender.clone());
     };
 
     // connect to the midi output
@@ -245,6 +263,7 @@ fn cc_loop(
     mut gui: Gui,
     nw_rx: mpsc::Receiver<f32>,
     metro_rx: mpsc::Receiver<f64>,
+    tui_sender: Option<Sender<CombinerMessage>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // connect to the midi output
     let mut midi_out = midier::create_midi_output_and_connect()?;
@@ -318,8 +337,20 @@ fn cc_loop(
         gui.replace_graph("value", &nw_periodic.activity);
         gui.show();
 
+        if let Some(sender) = &tui_sender {
+            if sender
+                .send(CombinerMessage::Output((0.0, val.into())))
+                .is_err()
+            {
+                // stop thread if sender is disconnected
+                break;
+            }
+        }
+
         sleep(Duration::from_millis(10));
     }
+
+    Ok(())
 }
 
 fn arpeggio_loop(
@@ -329,6 +360,7 @@ fn arpeggio_loop(
     nw_rx: mpsc::Receiver<f32>,
     wait_rx: mpsc::Receiver<f64>,
     context: zmq::Context,
+    tui_sender: Option<Sender<CombinerMessage>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // connect to the midi output
     let midi_out = midier::create_midi_output_and_connect()?;
@@ -417,11 +449,28 @@ fn arpeggio_loop(
             local_bpm = bpm;
         }
 
+        if let Some(sender) = &tui_sender {
+            if sender
+                .send(CombinerMessage::Output((
+                    0.0,
+                    nw_output.unwrap_or(0.0).into(),
+                )))
+                .is_err()
+            {
+                break;
+            }
+        }
+
         sleep(wait_dur);
     }
+
+    Ok(())
 }
 
-pub fn combine(args: CombinerArgs) -> Result<(), Box<dyn std::error::Error>> {
+pub fn combine(
+    args: CombinerArgs,
+    tui_sender: Option<Sender<CombinerMessage>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     // connect to the metronome publisher
     let context = zmq::Context::new();
     let metronome = context.socket(zmq::SUB).unwrap();
@@ -457,12 +506,16 @@ pub fn combine(args: CombinerArgs) -> Result<(), Box<dyn std::error::Error>> {
 
     let mut gui = Gui::new("Combiner");
     gui.add_row("output mode", &args.output);
+    if tui_sender.is_some() {
+        // don't print to stdout if the tui is running
+        gui.disable();
+    }
 
     match args.output {
-        super::OutputMode::Drum(d) => drum_loop(args, d, gui, wait_rx, nw_rx),
+        super::OutputMode::Drum(d) => drum_loop(args, d, gui, wait_rx, nw_rx, tui_sender),
         super::OutputMode::Arpeggio(arp_args) => {
-            arpeggio_loop(args, arp_args, gui, nw_rx, wait_rx, context)
+            arpeggio_loop(args, arp_args, gui, nw_rx, wait_rx, context, tui_sender)
         }
-        super::OutputMode::CC(cc_args) => cc_loop(args, cc_args, gui, nw_rx, wait_rx),
+        super::OutputMode::CC(cc_args) => cc_loop(args, cc_args, gui, nw_rx, wait_rx, tui_sender),
     }
 }

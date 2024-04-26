@@ -12,6 +12,8 @@ pub enum MidiError {
     CantCreateMidiOut,
     CantCreateMidiIn,
     CantConnectMidi,
+    PortNotOpen,
+    DeviceNotFound(String),
 }
 
 impl Display for MidiError {
@@ -25,6 +27,12 @@ impl Display for MidiError {
             }
             MidiError::CantConnectMidi => {
                 write!(f, "Can't connect to that midi port...")
+            }
+            MidiError::DeviceNotFound(d) => {
+                write!(f, "Device {} not found", d)
+            }
+            MidiError::PortNotOpen => {
+                write!(f, "Port is not available")
             }
         }
     }

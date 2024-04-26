@@ -99,7 +99,7 @@ pub fn list_models() -> Result<(), Box<dyn std::error::Error>> {
     let dir = models_dir()?;
     let mut seen_names = vec![];
 
-    for (_, path) in (std::fs::read_dir(dir)?).enumerate() {
+    for path in std::fs::read_dir(dir)? {
         let name = path.unwrap().file_name();
         let name = name
             .to_str()
@@ -176,7 +176,7 @@ pub fn list_data() -> Result<(), Box<dyn std::error::Error>> {
     println!("\x1b[1;92mTraining Data:\x1b[0m");
     let mut seen_names = vec![];
 
-    for (_, path) in (std::fs::read_dir(dir)?).enumerate() {
+    for path in std::fs::read_dir(dir)? {
         let name = path.unwrap().file_name();
         let name = name
             .to_str()

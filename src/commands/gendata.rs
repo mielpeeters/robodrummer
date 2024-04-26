@@ -34,6 +34,42 @@ impl RhythmPattern {
         println!("\x1b[1mRhythm Pattern:\x1b[0m\n\x1b[38;5;214m{self}\x1b[0m");
     }
 
+    #[allow(unused)]
+    pub fn rotation(&mut self, i: usize) {
+        let i = i % self.len();
+        let mut new_pattern = vec![false; self.len()];
+
+        #[allow(clippy::needless_range_loop)]
+        for j in 0..self.len() {
+            new_pattern[j] = self.0[(j + i) % self.len()];
+        }
+
+        self.0 = new_pattern;
+    }
+
+    #[allow(unused)]
+    pub fn center(&self) -> f32 {
+        let mut cg = 0;
+        let first_pulse = self.0.iter().position(|&x| x).unwrap();
+        let mut last_pulse = first_pulse;
+        self.0
+            .iter()
+            .enumerate()
+            .skip_while(|(i, _)| *i != first_pulse)
+            .skip(1)
+            .for_each(|(i, &x)| {
+                if x {
+                    // new pulse found
+                    cg += (i - last_pulse) * last_pulse;
+                    last_pulse = i;
+                }
+            });
+
+        cg += (self.len() - last_pulse) * last_pulse;
+
+        cg as f32 / self.len() as f32
+    }
+
     /// Convert the rhythm pattern to a time series
     /// (time, onset) pairs
     pub fn to_time_period<F>(&self, interpolate: F, period: f64) -> Vec<(f64, bool)>
@@ -136,13 +172,15 @@ fn chebyshev(density: f64, offset: f64) -> Box<dyn Fn(f64) -> Vec<f64>> {
 }
 
 struct Sequence {
-    sequence: Vec<Vec<bool>>,
-    n: usize,
-    k: usize,
+    pub sequence: Vec<Vec<bool>>,
+    pub n: usize,
+    pub k: usize,
 }
 
 impl Sequence {
     fn new(n: usize, k: usize) -> Self {
+        assert!(k <= n, "k must be less than or equal to n");
+
         let mut sequence = vec![];
 
         for i in 0..n {

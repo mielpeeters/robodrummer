@@ -114,7 +114,7 @@ pub fn start(
     let out_stream = device.build_output_stream(
         &config.config(),
         move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-            for (_, frame) in data.chunks_mut(channels).enumerate() {
+            for frame in data.chunks_mut(channels) {
                 let mut sample = output_queue.lock().unwrap();
                 let sample = sample.pop_front().unwrap_or(0.0);
                 for ch in frame {
