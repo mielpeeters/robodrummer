@@ -270,7 +270,10 @@ fn generate_input_times(mspb: f64, var: f64, duration: f64) -> Vec<f64> {
     times
 }
 
-fn pattern_to_csv(pattern: &RhythmPattern, args: &GenerateDataArgs) -> Result<(), Box<dyn Error>> {
+fn patterns_to_csv(
+    patterns: &[RhythmPattern],
+    args: &GenerateDataArgs,
+) -> Result<(), Box<dyn Error>> {
     let data_path = data_dir()?;
 
     // if the user supplied an extension, remove it
@@ -324,7 +327,11 @@ fn pattern_to_csv(pattern: &RhythmPattern, args: &GenerateDataArgs) -> Result<()
     let mut csv_writer = csv::Writer::from_path(csv_path)?;
 
     // write the header
-    csv_writer.write_record(["t", "input", "target"])?;
+    let mut header = vec!["t".to_string(), "input".to_string()];
+    for i in 0..patterns.len() {
+        header.push(format!("target_{}", i));
+    }
+    csv_writer.write_record(header)?;
 
     // calculate time between two pulses
     // TODO: input beat scaling
@@ -334,8 +341,11 @@ fn pattern_to_csv(pattern: &RhythmPattern, args: &GenerateDataArgs) -> Result<()
     // create one period of the target pattern
     let interpolate = match args.density {
         Some(d) => chebyshev(d as f64 / mspb_target, args.offset),
-        None => uniform(pattern.len() as f64 / mspb_target),
+        None => uniform(patterns.len() as f64 / mspb_target),
     };
+
+    // TODO: continue support for multiple outputs (thus multiple targets (thus multiple patterns))
+    let pattern = patterns.first().unwrap();
 
     let period: Vec<(f64, bool)> = pattern.to_time_period(interpolate, mspb_target);
 
@@ -414,15 +424,6 @@ fn pattern_to_csv(pattern: &RhythmPattern, args: &GenerateDataArgs) -> Result<()
     Ok(())
 }
 
-#[allow(unused)]
-fn poly_pattern_to_csv(
-    input_pattern: &RhythmPattern,
-    target_pattern: &RhythmPattern,
-    args: &GenerateDataArgs,
-) -> Result<(), Box<dyn Error>> {
-    Ok(())
-}
-
 /// Generate input-output data to train the reservoir, based on the given arguments
 ///
 /// This function uses research knowledge about rhythmic patterns to generate input-output data
@@ -438,14 +439,24 @@ pub fn gendata(args: GenerateDataArgs) -> Result<(), Box<dyn Error>> {
     //      - NP-DAG
     // - parameters for the sub-algorithm...
 
-    let target_pattern = match &args.algorithm {
-        super::RhythmAlgorithm::Euclidean(e) => euclidean(e.n, e.k),
-        // TODO: NP-DAG algorithm implementation
-        super::RhythmAlgorithm::NPDAG(_) => todo!("NP-DAG algorithm not implemented"),
-        super::RhythmAlgorithm::PolyEuclidean(p) => euclidean(p.n, p.k),
+    let target_patterns = match &args.algorithm {
+        super::RhythmAlgorithm::Euclidean(e) => {
+            assert!(
+                e.k.len() == e.n.len(),
+                "same amount of n and k values required"
+            );
+            let mut res = vec![];
+            for (n, k) in e.n.iter().zip(e.k.iter()) {
+                res.push(euclidean(*n, *k));
+            }
+            res
+        }
+        _ => todo!("Other algorithms are not yet implemented."),
     };
 
-    target_pattern.show();
+    for tp in &target_patterns {
+        tp.show();
+    }
 
-    pattern_to_csv(&target_pattern, &args)
+    patterns_to_csv(&target_patterns, &args)
 }

@@ -133,8 +133,10 @@ fn show_data_meta(metadata: &GenerateDataArgs) -> String {
         metadata.algorithm
     ));
     if let RhythmAlgorithm::Euclidean(e) = &metadata.algorithm {
-        output.push_str(&format!("       - k: \x1b[38;5;70m{}\x1b[0m\n", e.k));
-        output.push_str(&format!("       - n: \x1b[38;5;70m{}\x1b[0m\n", e.n));
+        for (n, k) in e.n.iter().zip(e.k.iter()) {
+            output.push_str(&format!("       - k: \x1b[38;5;70m{}\x1b[0m\n", k));
+            output.push_str(&format!("       - n: \x1b[38;5;70m{}\x1b[0m\n", n));
+        }
     }
     output.push_str(&format!(
         "     - bpm: \x1b[38;5;216m{}\x1b[0m\n",

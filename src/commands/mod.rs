@@ -267,17 +267,20 @@ impl Display for RhythmAlgorithm {
 #[derive(Args, Debug, Serialize, Deserialize)]
 pub struct EucledeanArgs {
     /// The amount of pulses in the euclidean rhythm
-    #[arg(short, long, default_value_t = 16)]
-    pub n: usize,
+    #[arg(short, long)]
+    pub n: Vec<usize>,
 
     /// The amount of onsets in the euclidean rhythm
-    #[arg(short, long, default_value_t = 5)]
-    pub k: usize,
+    #[arg(short, long)]
+    pub k: Vec<usize>,
 }
 
 impl Default for EucledeanArgs {
     fn default() -> Self {
-        EucledeanArgs { n: 8, k: 3 }
+        EucledeanArgs {
+            n: vec![8],
+            k: vec![3],
+        }
     }
 }
 
