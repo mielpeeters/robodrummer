@@ -29,7 +29,7 @@
 * ```sh
 * cargo build --release
 * ```
-* This will create the binary at `./target/release/neuroner`.
+* This will create the binary at `./target/release/robodrummer`.
 * You can also install it to be available in your PATH:
 * ```sh
 * cargo install --path .
@@ -38,20 +38,20 @@
 * # Usage
 * The basic usage would be the following:
 * ```sh
-* neuroner generate-data -o my_data euclidean -n 8 -k 3
+* robodrummer generate-data -o my_data euclidean -n 8 -k 3
 * ```
 * This generates a dataset of Euclidean rhythms with 8 pulses and 3 onsets.
 * <br>
 * To train a reservoir computer on this data, you can run:
 * ```sh
-* neuroner train --data my_data
+* robodrummer train --data my_data
 * ```
 * This will train a random reservoir of 300 neurons, and plot the data if Python with `matplotlib` and `pandas` is installed.
 * The binary will prompt you to give the trained model a name.
 * <br>
 * To run the trained model, you can run:
 * ```sh
-* neuroner run --model my_model
+* robodrummer run --model my_model
 * ```
 * This will run the model, and publish the output on a ZMQ socket (default socket is 4321).
 *
@@ -63,7 +63,7 @@
 *
 * You'll also need to run the MIDI broker:
 * ```sh
-* neuroner midi-broker -m single
+* robodrummer midi-broker -m single
 * ```
 * It will ask you to select a MIDI device to get input from.
 * This process handles the midi input and publishes it on another ZMQ socket.
@@ -72,7 +72,7 @@
 *
 * Finally, you can combine the output of the model, the metronome, and the MIDI input:
 * ```sh
-* neuroner combine -s 4
+* robodrummer combine -s 4
 * ````
 * This will run the combiner, which subdivides the metronome signal, and thresholds the model to
 * know which beats will be played and which won't.

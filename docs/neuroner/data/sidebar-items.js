@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["data_dir","get_data_metadata","get_model_metadata","list_data","list_models","load_train_data","models_dir"],"type":["Data"]};

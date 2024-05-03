@@ -222,7 +222,7 @@ nest! {
         #[arg(long, default_value_t = 0.0)]
         pub offset: f64,
 
-        /// The output name to write the data to (saved at $XDG_DATA_HOME/neuroner/traindata/{name}/)
+        /// The output name to write the data to (saved at $XDG_DATA_HOME/robodrummer/traindata/{name}/)
         #[arg(short, long, default_value = "default")]
         pub output: String,
 

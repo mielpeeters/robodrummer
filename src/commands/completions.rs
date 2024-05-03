@@ -13,7 +13,7 @@ fn write_completions<G: Generator>(gen: G, cmd: &mut Command) {
     let string = String::from_utf8(bytes).unwrap();
 
     // write to file ~/.zfunc/_neuroner
-    let path = home_dir().unwrap().join(".zfunc/_neuroner");
+    let path = home_dir().unwrap().join(".zfunc/_robodrummer");
     std::fs::write(path, string).unwrap();
 }
 

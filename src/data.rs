@@ -13,11 +13,11 @@ pub struct TrainData {
 
 const TRAIN_DATA_HEIGHT: f64 = 1.0;
 
-fn neuroner_dir() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+fn robodrummer_dir() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     // get the data dir for this app
     let mut path = dirs::data_dir().expect("Should get the data directory");
 
-    path.push("neuroner");
+    path.push("robodrummer");
 
     if !path.exists() {
         std::fs::create_dir_all(&path)?;
@@ -28,7 +28,7 @@ fn neuroner_dir() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
 
 pub fn models_dir() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     // get the data dir for this app
-    let mut path = neuroner_dir()?;
+    let mut path = robodrummer_dir()?;
     path.push("models");
 
     if !path.exists() {
@@ -40,7 +40,7 @@ pub fn models_dir() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
 
 pub fn data_dir() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     // get the data dir for this app
-    let mut path = neuroner_dir()?;
+    let mut path = robodrummer_dir()?;
     path.push("traindata");
 
     if !path.exists() {

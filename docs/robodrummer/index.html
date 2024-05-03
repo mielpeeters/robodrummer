@@ -1,0 +1,58 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="This crate contains all code for the RoboDrummer project."><title>robodrummer - Rust</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../static.files/rustdoc-5bc39a1768837dd0.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="robodrummer" data-themes="" data-resource-suffix="" data-rustdoc-version="1.77.2 (25ef9e3d8 2024-04-09)" data-channel="1.77.2" data-search-js="search-dd67cee4cfa65049.js" data-settings-js="settings-4313503d2e1961c2.js" ><script src="../static.files/storage-4c98445ec4002617.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-48f368f3872407c8.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-04d5337699b92874.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../robodrummer/index.html">robodrummer</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><ul class="block">
+            <li><a id="all-types" href="all.html">All Items</a></li></ul><section><ul class="block"><li><a href="#modules">Modules</a></li><li><a href="#macros">Macros</a></li></ul></section></div></nav><div class="sidebar-resizer"></div>
+    <main><div class="width-limiter"><nav class="sub"><form class="search-form"><span></span><div id="sidebar-button" tabindex="-1"><a href="../robodrummer/all.html" title="show sidebar"></a></div><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" tabindex="-1"><a href="../help.html" title="help">?</a></div><div id="settings-menu" tabindex="-1"><a href="../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="main-heading"><h1>Crate <a class="mod" href="#">robodrummer</a><button id="copy-path" title="Copy item path to clipboard"><img src="../static.files/clipboard-7571035ce49a181d.svg" width="19" height="18" alt="Copy item path"></button></h1><span class="out-of-band"><a class="src" href="../src/robodrummer/lib.rs.html#1-96">source</a> · <button id="toggle-all-docs" title="collapse all docs">[<span>&#x2212;</span>]</button></span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>This crate contains all code for the RoboDrummer project.</p>
+<p>This is a binary crate, meaning that it is intended to be compiled into a standalone executable.
+Although one binary is created, it has multiple modes of operation, depending on which subcommand you provide.
+These binaries then communicate with each other using ZMQ sockets, which means that there is no
+one order in which they need to be started.</p>
+<p>The different subcommands are:</p>
+<ul>
+<li><a href="commands/fn.gendata.html"><code>generate-data</code></a>: Generate training data based on rule based methods like Euclidean rhythms.</li>
+<li><a href="commands/fn.train.html"><code>train</code></a>: Train a reservoir computer on the generated data.</li>
+<li><a href="commands/fn.run.html"><code>run</code></a>: Run the trained reservoir.</li>
+<li><a href="commands/fn.update_completions.html"><code>completions</code></a>: Generate shell completions for the CLI. (zsh only)</li>
+<li><a href="commands/fn.broke.html"><code>midi-broker</code></a>: Runs the MIDI broker, which lies between the MIDI device and the rest of the
+system.</li>
+<li><a href="commands/fn.combine.html"><code>combine</code></a>: Combine the MIDI input, the model output, and the metronome output to create the
+desired output.</li>
+<li>TODO: <code>metronome</code>: Currently not part of this crate, but a separate one.</li>
+</ul>
+<h2 id="compilation"><a class="doc-anchor" href="#compilation">§</a>Compilation</h2>
+<p>Clone this repository, then run:</p>
+<div class="example-wrap"><pre class="language-sh"><code>cargo build --release
+</code></pre></div>
+<p>This will create the binary at <code>./target/release/robodrummer</code>.
+You can also install it to be available in your PATH:</p>
+<div class="example-wrap"><pre class="language-sh"><code>cargo install --path .
+</code></pre></div><h2 id="usage"><a class="doc-anchor" href="#usage">§</a>Usage</h2>
+<p>The basic usage would be the following:</p>
+<div class="example-wrap"><pre class="language-sh"><code>robodrummer generate-data -o my_data euclidean -n 8 -k 3
+</code></pre></div>
+<p>This generates a dataset of Euclidean rhythms with 8 pulses and 3 onsets.
+<br>
+To train a reservoir computer on this data, you can run:</p>
+<div class="example-wrap"><pre class="language-sh"><code>robodrummer train --data my_data
+</code></pre></div>
+<p>This will train a random reservoir of 300 neurons, and plot the data if Python with <code>matplotlib</code> and <code>pandas</code> is installed.
+The binary will prompt you to give the trained model a name.
+<br>
+To run the trained model, you can run:</p>
+<div class="example-wrap"><pre class="language-sh"><code>robodrummer run --model my_model
+</code></pre></div>
+<p>This will run the model, and publish the output on a ZMQ socket (default socket is 4321).</p>
+<br>
+<p>You will then need to run the metronome, which is a separate binary. (see metronomer crate)</p>
+<br>
+<p>You’ll also need to run the MIDI broker:</p>
+<div class="example-wrap"><pre class="language-sh"><code>robodrummer midi-broker -m single
+</code></pre></div>
+<p>It will ask you to select a MIDI device to get input from.
+This process handles the midi input and publishes it on another ZMQ socket.</p>
+<br>
+<p>Finally, you can combine the output of the model, the metronome, and the MIDI input:</p>
+<div class="example-wrap"><pre class="language-sh"><code>robodrummer combine -s 4
+</code></pre></div>
+<p>This will run the combiner, which subdivides the metronome signal, and thresholds the model to
+know which beats will be played and which won’t.</p>
+</div></details><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="mod" href="commands/index.html" title="mod robodrummer::commands">commands</a></div><div class="desc docblock-short">This module defines the command line interface for the application using clap.</div></li><li><div class="item-name"><a class="mod" href="constants/index.html" title="mod robodrummer::constants">constants</a></div><div class="desc docblock-short">Some constants which control the default model behaviour.</div></li><li><div class="item-name"><a class="mod" href="data/index.html" title="mod robodrummer::data">data</a></div></li><li><div class="item-name"><a class="mod" href="midier/index.html" title="mod robodrummer::midier">midier</a></div></li><li><div class="item-name"><a class="mod" href="midiutils/index.html" title="mod robodrummer::midiutils">midiutils</a></div></li><li><div class="item-name"><a class="mod" href="oscutil/index.html" title="mod robodrummer::oscutil">oscutil</a></div></li><li><div class="item-name"><a class="mod" href="reservoir/index.html" title="mod robodrummer::reservoir">reservoir</a></div></li><li><div class="item-name"><a class="mod" href="robot/index.html" title="mod robodrummer::robot">robot</a></div><div class="desc docblock-short">Connecting to the robot using the audio card’s output</div></li><li><div class="item-name"><a class="mod" href="series/index.html" title="mod robodrummer::series">series</a></div><div class="desc docblock-short">This module implements some useful timeseries to use as input / output data
+for training the network.</div></li><li><div class="item-name"><a class="mod" href="trainutil/index.html" title="mod robodrummer::trainutil">trainutil</a></div><div class="desc docblock-short">This module provides some functionality for training the network.</div></li></ul><h2 id="macros" class="section-header">Macros<a href="#macros" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="macro" href="macro.add_data.html" title="macro robodrummer::add_data">add_data</a></div></li></ul></section></div></main></body></html>

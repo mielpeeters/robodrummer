@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["BrokerMode","Command","OutputMode","RhythmAlgorithm"],"fn":["broke","combine","gendata","run","train","update_completions"],"struct":["Arguments","ArpeggioArgs","CCArgs","CombinerArgs","CompletionsArgs","EucledeanArgs","GenerateDataArgs","MidiBrokerArgs","NPDAGArgs","PolyEuclideanArgs","RunArgs","TrainArgs"]};

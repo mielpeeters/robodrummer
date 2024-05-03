@@ -1393,45 +1393,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "neuroner"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "blas-src",
- "cc",
- "clap",
- "clap_complete",
- "cpal",
- "crossterm",
- "csv",
- "derive_setters",
- "dirs 5.0.1",
- "env_logger",
- "hound",
- "indicatif",
- "log",
- "make-csv",
- "midi-control",
- "midir",
- "ndarray",
- "ndarray-linalg",
- "ndarray-npy",
- "ndarray-rand",
- "nestify",
- "openblas-src",
- "osc",
- "rand",
- "rand_distr",
- "ratatui",
- "serde",
- "sprs",
- "text_io",
- "toml",
- "tui-input",
- "zmq",
-]
-
-[[package]]
 name = "nix"
 version = "0.24.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1969,6 +1930,45 @@ name = "regex-syntax"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
+
+[[package]]
+name = "robodrummer"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "blas-src",
+ "cc",
+ "clap",
+ "clap_complete",
+ "cpal",
+ "crossterm",
+ "csv",
+ "derive_setters",
+ "dirs 5.0.1",
+ "env_logger",
+ "hound",
+ "indicatif",
+ "log",
+ "make-csv",
+ "midi-control",
+ "midir",
+ "ndarray",
+ "ndarray-linalg",
+ "ndarray-npy",
+ "ndarray-rand",
+ "nestify",
+ "openblas-src",
+ "osc",
+ "rand",
+ "rand_distr",
+ "ratatui",
+ "serde",
+ "sprs",
+ "text_io",
+ "toml",
+ "tui-input",
+ "zmq",
+]
 
 [[package]]
 name = "rosc"
