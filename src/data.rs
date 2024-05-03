@@ -53,11 +53,11 @@ pub fn data_dir() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
 fn show_model_meta(metadata: &TrainArgs) -> String {
     let mut output = String::new();
     output.push_str(&format!(
-        "     - size: \x1b[38;5;216m{}\x1b[0m\n",
+        "\t- size: \x1b[38;5;33m{}\x1b[0m\n",
         metadata.size
     ));
     output.push_str(&format!(
-        "     - mode: \x1b[38;5;216m{}\x1b[0m\n",
+        "\t- mode: \x1b[38;5;33m{}\x1b[0m\n",
         metadata.mode
     ));
     let structure = match metadata.npy {
@@ -65,12 +65,28 @@ fn show_model_meta(metadata: &TrainArgs) -> String {
         None => "Random ESN",
     };
     output.push_str(&format!(
-        "     - structure: \x1b[38;5;216m{}\x1b[0m\n",
+        "\t- structure: \x1b[38;5;33m{}\x1b[0m\n",
         structure
     ));
+    let data_metadata = data_metadata_string(&metadata.data);
     output.push_str(&format!(
-        "     - dataset: \x1b[38;5;216m{}\x1b[0m",
+        "\t- dataset: \x1b[38;5;33m{}\x1b[0m\n",
         metadata.data
+    ));
+    for line in data_metadata.lines() {
+        output.push_str(&format!("\t{}\n", line));
+    }
+    output.push_str(&format!(
+        "\t- timestep: \x1b[38;5;33m{} ms\x1b[0m\n",
+        metadata.timestep
+    ));
+    output.push_str(&format!(
+        "\t- target width: \x1b[38;5;33m{} ts\x1b[0m\n",
+        metadata.target_width
+    ));
+    output.push_str(&format!(
+        "\t- input width: \x1b[38;5;33m{} ts\x1b[0m\n",
+        metadata.width
     ));
     output
 }
@@ -90,7 +106,7 @@ pub fn get_model_metadata(name: &str) -> Result<TrainArgs, Box<dyn Error>> {
 pub fn model_metadata_string(name: &str) -> String {
     match get_model_metadata(name) {
         Ok(metadata) => show_model_meta(&metadata),
-        Err(_) => "NO METADATA".into(),
+        Err(_) => "\tNO METADATA".into(),
     }
 }
 
@@ -115,11 +131,11 @@ pub fn list_models() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("\x1b[1;92mTrained Models:\x1b[0m");
-    let clr = 214;
+    let clr = 202;
     for (i, name) in seen_names.iter().enumerate() {
         let meta_info = model_metadata_string(name);
 
-        println!("{i:3}: \x1b[38;5;{}m{name}\x1b[0m", clr as usize + i);
+        println!("{i:3}: \x1b[1;4m\x1b[38;5;{clr}m{name}\x1b[0m");
         println!("{}", meta_info);
     }
 
@@ -129,7 +145,7 @@ pub fn list_models() -> Result<(), Box<dyn std::error::Error>> {
 fn show_data_meta(metadata: &GenerateDataArgs) -> String {
     let mut output = String::new();
     output.push_str(&format!(
-        "     - algorithm: \x1b[38;5;216m{}\x1b[0m\n",
+        "     - algorithm: \x1b[3m\x1b[38;5;12m{}\x1b[0m\n",
         metadata.algorithm
     ));
     if let RhythmAlgorithm::Euclidean(e) = &metadata.algorithm {
@@ -139,28 +155,40 @@ fn show_data_meta(metadata: &GenerateDataArgs) -> String {
         }
     }
     output.push_str(&format!(
-        "     - bpm: \x1b[38;5;216m{}\x1b[0m\n",
+        "     - bpm: \x1b[38;5;12m{}\x1b[0m\n",
         metadata.bpm
     ));
     output.push_str(&format!(
-        "     - variance: \x1b[38;5;216m{}\x1b[0m\n",
+        "     - variance: \x1b[38;5;12m{}\x1b[0m\n",
         metadata.variance
     ));
     output.push_str(&format!(
-        "     - scale: \x1b[38;5;216m{}\x1b[0m",
+        "     - scale: \x1b[38;5;12m{}\x1b[0m",
         metadata.scale
     ));
     output
 }
 
 pub fn get_data_metadata(name: &str) -> Result<GenerateDataArgs, Box<dyn Error>> {
+    log::debug!("Getting metadata for {}", name);
     let meta_path = data_dir()?.join(format!("{}.toml", name));
 
     if meta_path.exists() {
+        log::debug!("Metadata path exists for {}: {:?}", name, meta_path);
         let toml_string = std::fs::read_to_string(meta_path)?;
-        let metadata = toml::from_str(&toml_string)?;
+        log::debug!("toml_string: {}", toml_string);
+        let metadata = toml::from_str(&toml_string).map_err(|e| {
+            log::debug!("Error parsing metadata: {}", e);
+            e
+        })?;
+        log::debug!("metadata: {:?}", metadata);
         Ok(metadata)
     } else {
+        log::debug!(
+            "Metadata path does not exists for {}: {:?}",
+            name,
+            meta_path
+        );
         Err(format!("No metadata exists for data name {}", name).into())
     }
 }
@@ -168,7 +196,7 @@ pub fn get_data_metadata(name: &str) -> Result<GenerateDataArgs, Box<dyn Error>>
 pub fn data_metadata_string(name: &str) -> String {
     match get_data_metadata(name) {
         Ok(metadata) => show_data_meta(&metadata),
-        Err(_) => "NO METADATA".into(),
+        Err(_) => "\tNO METADATA".into(),
     }
 }
 
@@ -193,10 +221,10 @@ pub fn list_data() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    let clr = 214;
+    let clr = 202;
     for (i, name) in seen_names.iter().enumerate() {
         let meta_info = data_metadata_string(name);
-        println!("{i:3}: \x1b[38;5;{}m{name}\x1b[0m", clr as usize + i);
+        println!("{i:3}: \x1b[1;4m\x1b[38;5;{clr}m{name}\x1b[0m");
         println!("{}", meta_info);
     }
 
