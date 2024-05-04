@@ -100,6 +100,12 @@ impl RhythmPattern {
             };
 
             let interp_times = interpolate(next_hit_time - *hit_time);
+            log::debug!(
+                "Interpolating from {} to {} with {:?}",
+                hit_time,
+                next_hit_time,
+                interp_times
+            );
             for t in interp_times {
                 time_series.push((t + *hit_time, false));
             }
@@ -140,6 +146,8 @@ fn uniform(density: f64) -> Box<dyn Fn(f64) -> Vec<f64>> {
     let func = move |width: f64| {
         // amount of points to generate
         let n = (width * density + 0.00001).floor() as usize;
+
+        log::debug!("Width: {}, Density: {}, N: {}", width, density, n);
 
         let dist = width / n as f64;
 
@@ -339,15 +347,30 @@ fn patterns_to_csv(
     let mspb_target = mspb * args.scale as f64;
 
     // create one period of the target pattern
-    let interpolate = match args.density {
-        Some(d) => chebyshev(d as f64 / mspb_target, args.offset),
-        None => uniform(patterns.len() as f64 / mspb_target),
+    let interpolates = match args.density {
+        Some(d) => {
+            let mut res = vec![];
+            for _ in patterns {
+                res.push(chebyshev(d as f64 / mspb_target, args.offset));
+            }
+            res
+        }
+        None => {
+            let mut res = vec![];
+            for p in patterns {
+                res.push(uniform(p.len() as f64 / mspb_target));
+            }
+            res
+        }
     };
 
     // TODO: continue support for multiple outputs (thus multiple targets (thus multiple patterns))
     let pattern = patterns.first().unwrap();
+    let interpolate = interpolates.first().unwrap();
 
     let period: Vec<(f64, bool)> = pattern.to_time_period(interpolate, mspb_target);
+
+    log::debug!("Period: {:?}", period);
 
     let n_periods = (args.duration_s * 1000.0 / mspb_target) as usize;
     let mut targets: VecDeque<(f64, bool)> = (0..n_periods)
