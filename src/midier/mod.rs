@@ -6,7 +6,7 @@ use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::{self, Receiver},
-        Arc,
+        Arc, Condvar, Mutex,
     },
     thread,
 };
@@ -125,19 +125,23 @@ pub fn setup_midi_receiver(
     let (error_tx, error_rx) = mpsc::channel();
     let (tx, rx) = mpsc::channel();
     thread::spawn(move || {
-        let no_connection_left = Arc::new(AtomicBool::new(false));
+        let no_connection_left = Arc::new((Mutex::new(false), Condvar::new()));
         let no_connection_left_clone = no_connection_left.clone();
         let midi_in = create_midi_input_and_connect(
             move |stamp, msg, tx_local| {
                 let midimsg = MidiMessage::from(msg);
                 if let MidiMessage::NoteOn(c, k) = midimsg {
+                    // filter on midi channel if needed
                     if let Some(channel) = channel {
                         if c != (channel - 1).into() {
                             return;
                         }
                     }
+
+                    // send the midi keyevent to the main thread
                     if tx_local.send((stamp, k)).is_err() {
-                        no_connection_left_clone.store(true, Ordering::Relaxed)
+                        *no_connection_left_clone.0.lock().unwrap() = true;
+                        no_connection_left_clone.1.notify_all()
                     };
                 };
             },
@@ -152,15 +156,12 @@ pub fn setup_midi_receiver(
 
         done_clone.store(true, Ordering::Relaxed);
 
-        loop {
-            if no_connection_left.load(Ordering::Relaxed) {
-                // not needed but this shows the purpose
-                drop(midi_in);
-                break;
-            }
-            // keep the thread (thus the midi connection) alive
-            thread::sleep(std::time::Duration::from_millis(100000));
+        let mut no_left = no_connection_left.0.lock().unwrap();
+        while !*no_left {
+            no_left = no_connection_left.1.wait(no_left).unwrap();
         }
+
+        drop(midi_in);
     });
 
     while !done.load(std::sync::atomic::Ordering::Relaxed) {

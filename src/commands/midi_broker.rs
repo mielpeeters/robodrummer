@@ -87,6 +87,9 @@ fn single(
 
     loop {
         // wait for incomming midi messages
+        // This receive is blocking with a timeout
+        // The timeout is there in order to send a heartbeat to the TUI thread every now and then
+        // (if spawned from the TUI)
         let received = rx.recv_timeout(Duration::from_millis(100));
         if let Ok((timestamp, keyevent)) = received {
             midi_filter.add(timestamp, keyevent);
@@ -104,7 +107,9 @@ fn single(
             // check if connection is alive
             if let Some(sender) = &tui_sender {
                 if sender.send(MidiTuiMessage::Heartbeat).is_err() {
-                    // connection is not live anymore, close this thread
+                    // connection is not live anymore
+                    // (another instance might be setting up)
+                    // close this thread
                     break;
                 }
             }
