@@ -85,6 +85,7 @@ pub mod constants;
 pub mod data;
 mod errors;
 mod guier;
+pub mod metronomer;
 pub mod midier;
 pub mod midiutils;
 pub mod oscutil;

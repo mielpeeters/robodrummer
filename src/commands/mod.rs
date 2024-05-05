@@ -5,6 +5,7 @@
 mod combine;
 mod completions;
 mod gendata;
+mod metronome;
 mod midi_broker;
 mod run;
 mod test_robot;
@@ -21,6 +22,7 @@ pub use crate::tui::start_tui as tui;
 pub use combine::combine;
 pub use completions::update_completions;
 pub use gendata::gendata;
+pub use metronome::metronome;
 pub use midi_broker::broke;
 pub use run::run;
 pub use test_robot::robot;
@@ -47,6 +49,7 @@ pub enum Command {
     GenerateData(GenerateDataArgs),
     Completions(CompletionsArgs),
     MidiBroker(MidiBrokerArgs),
+    Metronome(MetronomeArgs),
     Combine(CombinerArgs),
     Tui(TuiArgs),
     Robot(RobotArgs),
@@ -502,4 +505,15 @@ pub struct RobotArgs {
 pub enum RobotCommand {
     Sweep,
     WaveType,
+}
+
+#[derive(Args, Debug)]
+pub struct MetronomeArgs {
+    /// Port to publish on
+    #[clap(long, default_value_t = METRONOME_PORT)]
+    metronome_port: u16,
+
+    /// Port to publish on
+    #[clap(long, default_value_t = MIDI_PORT)]
+    midi_port: u16,
 }
