@@ -520,7 +520,12 @@ impl Reservoir {
     ///   or to provide the target output at every time step.
     /// - The returned error is the error the model makes at the moment, thus before the training
     ///   step
-    pub fn train_step(&mut self, inputs: &[Array1<f64>], targets: &[Option<Array1<f64>>]) -> f64 {
+    pub fn train_step(
+        &mut self,
+        inputs: &[Array1<f64>],
+        targets: &[Option<Array1<f64>>],
+        offset: usize,
+    ) -> f64 {
         // if the target times are given, we only train the network at those times
         // otherwise, we train at all times
         let train_instants_count = targets.iter().filter(|x| x.is_some()).count();
@@ -531,7 +536,7 @@ impl Reservoir {
         let mut column_idx = 0;
 
         // calculate all states
-        for (j, input) in inputs.iter().enumerate() {
+        for (j, input) in inputs.iter().skip(offset).enumerate() {
             self.forward(input);
 
             // only train the specified times
@@ -604,8 +609,40 @@ impl Reservoir {
         let result = sprs::CsMat::csr_from_dense(self.weights_res_res.view(), -1.0);
         self.weights_rr_sparse = Some(result);
     }
+}
 
-    //     pub fn set_decomp(&mut self) {
-    //         let decomp = self.weights_res_res.clone().ch
-    //     }
+#[cfg(test)]
+mod tests {
+    use make_csv::{csv_entry, csv_start, csv_stop};
+
+    use crate::data::load_train_data;
+
+    use super::*;
+
+    #[test]
+    fn example_run_for_plots() {
+        let data_name = "default";
+        let model_name = "3_8";
+
+        let timestep = 20.0;
+        let width = 10;
+        let target_width = 1;
+
+        let mut nw = Reservoir::load_from_name(model_name).unwrap();
+
+        let (inputs, _targets) =
+            load_train_data(data_name, timestep, width, target_width, None).unwrap();
+
+        let mut wtr = csv_start!("data/width_10.csv");
+
+        csv_entry!(wtr <- "t", "input", "nw");
+
+        for (i, input) in inputs.iter().enumerate() {
+            nw.forward(input);
+
+            csv_entry!(wtr <- i, input[0], nw.output[0]);
+        }
+
+        csv_stop!(wtr);
+    }
 }
