@@ -1,11 +1,11 @@
-#![allow(unreachable_code)]
-use std::{thread, time::Duration};
+// #![allow(unreachable_code)]
+use std::thread;
 
 use crate::guier::Gui;
 use crate::metronomer::inputwindow::{HitAction, InputWindow};
 use clap::Parser;
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 
 use super::MetronomeArgs;
 
@@ -30,23 +30,26 @@ struct Args {
     midi_port: u16,
 }
 
-fn gather_data(data: Arc<Mutex<InputWindow>>, midi_sub: zmq::Socket) {
+fn gather_data(data: Arc<(Mutex<InputWindow>, Condvar)>, midi_sub: zmq::Socket) {
     loop {
         let msg = midi_sub.recv_msg(0).unwrap();
         let msg = msg.as_str().unwrap();
 
         log::info!("Received: {}", msg);
 
-        data.lock().unwrap().hit(HitAction::BandedInterval(3))
+        if data.0.lock().unwrap().hit(HitAction::BandedInterval(3)) {
+            // notify main thread about potentially changed best_frequency
+            data.1.notify_one();
+        }
     }
 }
 
 pub fn metronome(args: MetronomeArgs) -> Result<(), Box<dyn std::error::Error>> {
     // input data
-    let window = Arc::new(Mutex::new(InputWindow::new_with_size(
-        FFT_SIZE,
-        SAMPLE_PERIOD,
-    )));
+    let window = Arc::new((
+        Mutex::new(InputWindow::new_with_size(FFT_SIZE, SAMPLE_PERIOD)),
+        Condvar::new(),
+    ));
 
     let context = zmq::Context::new();
     let publisher = context.socket(zmq::PUB)?;
@@ -68,28 +71,25 @@ pub fn metronome(args: MetronomeArgs) -> Result<(), Box<dyn std::error::Error>> 
         "Metronomer (max freq: {:2.0}, freq step: {:4.3})",
         MAX_FREQ, FREQ_STEP
     ));
-    gui.add_row("input_count", window.lock().unwrap().hit_count);
+    gui.add_row("input count", window.0.lock().unwrap().hit_count);
     gui.add_row("best BPM", 120);
 
     gui.show();
 
     // main loop
     loop {
+        let (window, condvar) = &*window;
+        let mut w = window.lock().unwrap();
+        while last_hc == w.hit_count {
+            w = condvar.wait(w).unwrap();
+        }
         // best frequency atm
-        let max_freq = {
-            let w = window.lock().unwrap();
-            let hc = w.hit_count;
-            if hc != last_hc {
-                gui.update_row("input_count", &hc);
-                gui.show();
-                last_hc = hc;
-            }
-            w.best_frequency
-        };
+        let max_freq = w.best_frequency;
+        last_hc = w.hit_count;
+
+        drop(w);
 
         if last_best == max_freq {
-            // sleep a bit for performance reasons
-            thread::sleep(Duration::from_millis(100));
             continue;
         }
 
@@ -99,10 +99,7 @@ pub fn metronome(args: MetronomeArgs) -> Result<(), Box<dyn std::error::Error>> 
         publisher.send(msg.as_slice(), 0)?;
 
         gui.update_row("best BPM", &(max_freq * 60.0));
+        gui.update_row("input count", &last_hc);
         gui.show();
-
-        // sleep for a bit
-        thread::sleep(Duration::from_millis(200));
     }
-    Ok(())
 }
