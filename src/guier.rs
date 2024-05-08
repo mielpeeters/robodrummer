@@ -147,7 +147,7 @@ impl Graph {
 pub struct Gui {
     name: String,
     rows: Vec<Row>,
-    enabled: bool,
+    pub enabled: bool,
 }
 
 impl Gui {

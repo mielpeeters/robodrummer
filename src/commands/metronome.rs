@@ -1,8 +1,10 @@
+use std::sync::mpsc::Sender;
 // #![allow(unreachable_code)]
 use std::thread;
 
 use crate::guier::Gui;
 use crate::metronomer::inputwindow::{HitAction, InputWindow};
+use crate::tui::messages::MetronomeMessage;
 use clap::Parser;
 
 use std::sync::{Arc, Condvar, Mutex};
@@ -44,7 +46,10 @@ fn gather_data(data: Arc<(Mutex<InputWindow>, Condvar)>, midi_sub: zmq::Socket) 
     }
 }
 
-pub fn metronome(args: MetronomeArgs) -> Result<(), Box<dyn std::error::Error>> {
+pub fn metronome(
+    args: MetronomeArgs,
+    tui_sender: Option<Sender<MetronomeMessage>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     // input data
     let window = Arc::new((
         Mutex::new(InputWindow::new_with_size(FFT_SIZE, SAMPLE_PERIOD)),
@@ -74,6 +79,10 @@ pub fn metronome(args: MetronomeArgs) -> Result<(), Box<dyn std::error::Error>> 
     gui.add_row("input count", window.0.lock().unwrap().hit_count);
     gui.add_row("best BPM", 120);
 
+    if tui_sender.is_some() {
+        gui.disable();
+    }
+
     gui.show();
 
     // main loop
@@ -98,8 +107,19 @@ pub fn metronome(args: MetronomeArgs) -> Result<(), Box<dyn std::error::Error>> 
         let msg = max_freq.to_be_bytes();
         publisher.send(msg.as_slice(), 0)?;
 
-        gui.update_row("best BPM", &(max_freq * 60.0));
-        gui.update_row("input count", &last_hc);
-        gui.show();
+        if gui.enabled {
+            gui.update_row("best BPM", &(max_freq * 60.0));
+            gui.update_row("input count", &last_hc);
+            gui.show();
+        }
+
+        if let Some(sender) = &tui_sender {
+            if sender.send(MetronomeMessage::Tempo(max_freq)).is_err() {
+                // this connection is dead, close this thread!
+                break;
+            }
+        }
     }
+
+    Ok(())
 }

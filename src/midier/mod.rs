@@ -24,18 +24,31 @@ fn ask(question: &str) -> usize {
     answer.trim().parse::<usize>().unwrap()
 }
 
-pub fn create_midi_output_and_connect() -> Result<midir::MidiOutputConnection, errors::MidiError> {
+pub fn create_midi_output_and_connect(
+    device: Option<String>,
+) -> Result<midir::MidiOutputConnection, errors::MidiError> {
     let Ok(output) = midir::MidiOutput::new("midier output") else {
         return Err(errors::MidiError::CantCreateMidiOut);
     };
 
-    println!("Available Midi ports to connect to:");
     let ports = output.ports();
-    for (i, port) in ports.iter().enumerate() {
-        println!("{i}:   {}", output.port_name(port).unwrap());
-    }
 
-    let num = ask("Select one: ");
+    let num = if let Some(device) = &device {
+        ports
+            .iter()
+            .position(|port| check_midi_device(&output.port_name(port).unwrap(), device))
+            .ok_or(errors::MidiError::DeviceNotFound(device.to_string()))?
+    } else {
+        println!("Available Midi ports to connect to:");
+        for (i, port) in ports.iter().enumerate() {
+            println!("\t{i}: {}", output.port_name(port).unwrap());
+        }
+        let res = ask("Select one: ");
+        if res >= ports.len() {
+            return Err(errors::MidiError::PortNotOpen);
+        }
+        res
+    };
 
     let name = output.port_name(ports.get(num).unwrap()).unwrap();
 
@@ -43,7 +56,9 @@ pub fn create_midi_output_and_connect() -> Result<midir::MidiOutputConnection, e
         return Err(errors::MidiError::CantConnectMidi);
     };
 
-    println!("Connected to Midi device \x1b[1m{}\x1b[0m!", name);
+    if device.is_none() {
+        println!("Connected to Midi device \x1b[1m{}\x1b[0m!", name);
+    }
 
     Ok(conn)
 }
@@ -182,7 +197,7 @@ mod tests {
 
     #[test]
     fn test_output() {
-        let conn = create_midi_output_and_connect();
+        let conn = create_midi_output_and_connect(None);
 
         assert!(conn.is_ok(), "Connection wasnt correctly created")
     }

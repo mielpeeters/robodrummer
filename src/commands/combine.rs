@@ -185,7 +185,7 @@ fn drum_loop(
     };
 
     // connect to the midi output
-    let mut midi_out = midier::create_midi_output_and_connect()?;
+    let mut midi_out = midier::create_midi_output_and_connect(args.device)?;
 
     gui.add_row("playing", false);
 
@@ -221,8 +221,16 @@ fn drum_loop(
             local_bpm = bpm;
         }
 
+        if let Some(sender) = &tui_sender {
+            if sender.send(CombinerMessage::Heartbeat).is_err() {
+                break;
+            }
+        }
+
         sleep(wait_dur);
     }
+
+    Ok(())
 }
 
 // TODO: make every peak audible somehow
@@ -258,7 +266,7 @@ fn map_model_to_cc(
 }
 
 fn cc_loop(
-    _args: CombinerArgs,
+    args: CombinerArgs,
     cc_args: CCArgs,
     mut gui: Gui,
     nw_rx: mpsc::Receiver<f32>,
@@ -266,7 +274,7 @@ fn cc_loop(
     tui_sender: Option<Sender<CombinerMessage>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // connect to the midi output
-    let mut midi_out = midier::create_midi_output_and_connect()?;
+    let mut midi_out = midier::create_midi_output_and_connect(args.device)?;
 
     // GUI output
     gui.add_row("cc target", cc_args.cc);
@@ -363,7 +371,7 @@ fn arpeggio_loop(
     tui_sender: Option<Sender<CombinerMessage>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // connect to the midi output
-    let midi_out = midier::create_midi_output_and_connect()?;
+    let midi_out = midier::create_midi_output_and_connect(args.device)?;
 
     // GUI output
     gui.add_row("chord", "None");

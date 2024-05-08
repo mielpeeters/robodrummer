@@ -21,7 +21,7 @@ pub fn send_beat(conn: &mut midir::MidiOutputConnection, num: u32) {
 pub fn play_model(mut model: Box<Reservoir>) {
     model.reset_state();
 
-    let mut midi_out = create_midi_output_and_connect().unwrap();
+    let mut midi_out = create_midi_output_and_connect(None).unwrap();
 
     let mut curr = [model.get_output(0), model.get_output(1)];
     // let mut speed = [0.0; 2];

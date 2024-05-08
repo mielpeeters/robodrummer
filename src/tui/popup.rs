@@ -11,6 +11,8 @@ pub struct PopupInput<'a> {
     pub title: &'a str,
     #[setters(into)]
     pub question: &'a str,
+    #[setters(into)]
+    pub options: Option<&'a [String]>,
     pub input: &'a str,
 }
 
@@ -37,16 +39,42 @@ impl Widget for PopupInput<'_> {
             .border_set(border::ROUNDED);
 
         block.render(area, buf);
-
-        let popup_chunks = Layout::vertical([Constraint::Length(1), Constraint::Min(1)])
-            .margin(1)
-            .split(area);
-
         let question = Text::styled(self.question, Style::default().fg(Color::LightGreen).bold());
         let input = Text::from(format!("> {}", self.input));
 
-        Paragraph::new(question).render(popup_chunks[0], buf);
-        Paragraph::new(input).render(popup_chunks[1], buf);
+        match self.options {
+            None => {
+                let popup_chunks = Layout::vertical([Constraint::Length(1), Constraint::Min(1)])
+                    .margin(1)
+                    .split(area);
+
+                Paragraph::new(question).render(popup_chunks[0], buf);
+                Paragraph::new(input).render(popup_chunks[1], buf);
+            }
+            Some(o) => {
+                let popup_chunks = Layout::vertical([
+                    Constraint::Length(1),
+                    Constraint::Fill(1),
+                    Constraint::Length(1),
+                ])
+                .margin(1)
+                .split(area);
+
+                let options_string = o
+                    .iter()
+                    .enumerate()
+                    .map(|(i, o)| format!("{}: {}", i, o))
+                    .collect::<Vec<String>>()
+                    .join("\n");
+
+                let options =
+                    Text::styled(options_string, Style::default().fg(Color::LightBlue).bold());
+
+                Paragraph::new(question).render(popup_chunks[0], buf);
+                Paragraph::new(options).render(popup_chunks[1], buf);
+                Paragraph::new(input).render(popup_chunks[2], buf);
+            }
+        }
     }
 }
 

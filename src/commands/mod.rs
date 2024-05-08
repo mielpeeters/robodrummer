@@ -378,7 +378,7 @@ impl MidiBrokerArgs {
     }
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Debug, Clone)]
 pub struct CombinerArgs {
     /// port of the metronome publisher
     #[arg(short, long, default_value_t = METRONOME_PORT)]
@@ -394,14 +394,31 @@ pub struct CombinerArgs {
 
     /// Subdivision of metronome beat
     #[arg(short, long, default_value_t = 1)]
-    subdivision: u8,
+    pub subdivision: u8,
 
     /// output mode
     #[command(subcommand)]
-    output: OutputMode,
+    pub output: OutputMode,
+
+    /// The MIDI device (if not given, is interactively asked)
+    #[arg(long)]
+    pub device: Option<String>,
 }
 
-#[derive(Subcommand, Debug)]
+impl Default for CombinerArgs {
+    fn default() -> Self {
+        Self {
+            metro_port: METRONOME_PORT,
+            feel_port: FEEL_PORT,
+            threshold: 0.5,
+            subdivision: 4,
+            output: OutputMode::default(),
+            device: None,
+        }
+    }
+}
+
+#[derive(Subcommand, Debug, Clone)]
 pub enum OutputMode {
     Drum(DrumArgs),
     Arpeggio(ArpeggioArgs),
@@ -418,16 +435,23 @@ impl Display for OutputMode {
     }
 }
 
+impl Default for OutputMode {
+    fn default() -> Self {
+        Self::Drum(DrumArgs::default())
+    }
+}
+
 nest! {
     /// Arguments for the drum output mode
-    #[derive(Args, Debug, Copy, Clone)]
+    #[derive(Args, Debug, Copy, Clone, Default)]
     pub struct DrumArgs {
         /// Select either MIDI or Robot output
         #[arg(short, long, default_value = "midi", value_enum)]
         pub output:
-            #[derive(ValueEnum, Clone, Debug, Copy)]
+            #[derive(ValueEnum, Clone, Debug, Copy, Default)]
             pub enum DrumOutput {
                 /// Output to midi, without delay compensation
+                #[default]
                 pub Midi,
                 /// Output to audio, used by the robot to
                 /// control the motor.
@@ -516,4 +540,13 @@ pub struct MetronomeArgs {
     /// Port to publish on
     #[clap(long, default_value_t = MIDI_PORT)]
     midi_port: u16,
+}
+
+impl Default for MetronomeArgs {
+    fn default() -> Self {
+        Self {
+            metronome_port: METRONOME_PORT,
+            midi_port: MIDI_PORT,
+        }
+    }
 }

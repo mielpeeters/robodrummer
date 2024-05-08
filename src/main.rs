@@ -28,6 +28,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         robodrummer::commands::Command::Combine(c) => combine(c, None),
         robodrummer::commands::Command::Tui(t) => tui(t),
         robodrummer::commands::Command::Robot(r) => robot(r),
-        robodrummer::commands::Command::Metronome(m) => metronome(m),
+        robodrummer::commands::Command::Metronome(m) => metronome(m, None),
     }
 }
