@@ -86,7 +86,8 @@ impl InputWindow {
     }
 
     /// Add a hit to the input window, using the given HitAction
-    pub fn hit(&mut self, action: HitAction) {
+    /// Returns true if the best frequency was updated
+    pub fn hit(&mut self, action: HitAction) -> bool {
         self.hit_count += 1;
 
         if self.hit_count == 1 {
@@ -104,18 +105,18 @@ impl InputWindow {
 
         // calculate fourier only when the action asks for it and we have enough hits
         if action == HitAction::NoFourier {
-            return;
+            return false;
         }
 
         match action {
             HitAction::Interval(interval) | HitAction::BandedInterval(interval) => {
                 if self.hit_count % interval as u32 != 0 {
-                    return;
+                    return false;
                 }
 
                 // if we can't find dominant frequency, we don't do anything
                 let Some(frequencies) = self.fft() else {
-                    return;
+                    return false;
                 };
 
                 // update our best estimated frequency
@@ -133,6 +134,8 @@ impl InputWindow {
         if let HitAction::BandedInterval(_) = action {
             self.set_band();
         }
+
+        true
     }
 
     pub fn show_window(&self) {
@@ -340,7 +343,32 @@ mod tests {
     }
 
     #[test]
-    fn human_hits() {
+    fn human_hits_three() {
+        let mut iw = InputWindow::new_with_size(IW_SIZE, SAMPLE_PERIOD);
+
+        // manually create the window VecDeque
+        let mut w = VecDeque::from(vec![0; IW_SIZE]);
+
+        let offsets = [0, -1, 0, 0, 1, 0];
+
+        // input are regularly spaced hits, at 250ms, thus 5 periods apart
+        for i in 0..HIT_COUNT {
+            if i % 4 == 0 {
+                continue;
+            }
+            let period = i as i32 * HIT_INTERVAL + offsets[i as usize % 6];
+            w.push_front(period as u128);
+            w.pop_back();
+        }
+
+        iw.window = w;
+
+        // plot the decision
+        iw.plot_decision();
+    }
+
+    #[test]
+    fn human_hits_all() {
         let mut iw = InputWindow::new_with_size(IW_SIZE, SAMPLE_PERIOD);
 
         // manually create the window VecDeque
