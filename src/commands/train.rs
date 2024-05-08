@@ -35,7 +35,7 @@ fn analyze(
 ) {
     {
         // plot target and network output graph
-        let mut wtr = csv_start!("out.csv");
+        let mut wtr = csv_start!("data/network_trained.csv");
         csv_entry!(wtr <- "t", "nw_0", "target_0", "input_0");
 
         (0..train_inputs.len()).for_each(|i| {
@@ -50,28 +50,26 @@ fn analyze(
             }
         });
     }
-    python!("plot.py");
+    python!("plot.py", "data/network_trained.csv");
 
     {
         // plot error graph
-        let mut wtr = csv_start!("out.csv");
+        let mut wtr = csv_start!("data/error.csv");
         csv_entry!(wtr <- "t", "error");
 
         for (i, error) in errors.iter().enumerate() {
             csv_entry!(wtr <- i, error);
         }
     }
-    python!("plot.py");
+    python!("plot.py", "data/error.csv");
 
     {
         // plot test graph
-        let mut wtr = csv_start!("out.csv");
-        let mut int_wtr = csv_start!("int_states.csv");
+        let mut wtr = csv_start!("data/network_test.csv");
+        let mut int_wtr = csv_start!("data/int_states.csv");
 
         csv_entry!(wtr <- "t", "nw_0", "input_0");
-        if args.npy.is_some() {
-            csv_entry!(int_wtr <- "t", "state_0", "state_1", "state_2", "state_3");
-        }
+        csv_entry!(int_wtr <- "t", "state_0", "state_1", "state_2", "state_3");
 
         nw.reset_state();
 
@@ -80,9 +78,7 @@ fn analyze(
 
             csv_entry!(wtr <- i, nw.output[0], input[0]);
             let states = nw.get_visible_state();
-            if args.npy.is_some() {
-                csv_entry!(int_wtr <- i, states[0], states[10], states[20], states[35]);
-            }
+            csv_entry!(int_wtr <- i, states[0], states[10], states[20], states[35]);
         }
 
         // also add some zeros to see the steady state behaviour
@@ -91,15 +87,11 @@ fn analyze(
             nw.forward(&input);
             csv_entry!(wtr <- i + test_inputs.len(), nw.output[0], input[0]);
             let states = nw.get_visible_state();
-            if args.npy.is_some() {
-                csv_entry!(int_wtr <- i, states[0], states[10], states[20], states[35]);
-            }
+            csv_entry!(int_wtr <- i, states[0], states[10], states[20], states[35]);
         }
     }
-    python!("plot.py");
-    if args.npy.is_some() {
-        python!("plot.py", "int_states.csv");
-    }
+    python!("plot.py", "data/network_test.csv");
+    python!("plot.py", "data/int_states.csv");
 }
 
 pub fn train(args: super::TrainArgs) -> Result<(), Box<dyn Error>> {
@@ -150,9 +142,12 @@ pub fn train(args: super::TrainArgs) -> Result<(), Box<dyn Error>> {
         weight_history.assign(&nw.weights_res_out);
 
         let error = match args.mode {
-            TrainMode::Inv => nw.train_step(train_inputs, targets),
+            TrainMode::Inv => nw.train_step(train_inputs, targets, (i as usize * 15) % 31),
             TrainMode::Grad => nw.train_mse_grad(train_inputs, targets),
         };
+
+        // important...
+        nw.reset_state();
 
         errors.push(error);
         pb.inc(1);
