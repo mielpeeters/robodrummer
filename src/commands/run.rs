@@ -7,9 +7,9 @@ use std::{
 use crate::{
     data::{get_model_metadata, list_models},
     guier::Gui,
+    messages::{MidiNoteMessage, NetworkMessage},
     oscutil,
     reservoir::Reservoir,
-    tui::messages::NetworkMessage,
 };
 use ndarray::Array1;
 
@@ -79,8 +79,11 @@ pub fn run(
 
         // input zero on non-inputs, 1 on inputs
         let mut input = Array1::zeros(nw.inputs);
-        if midi_in.recv_bytes(zmq::DONTWAIT).is_ok() {
-            input_steps_remaining = input_width;
+        if let Ok(midi_msg) = midi_in.recv_bytes(zmq::DONTWAIT) {
+            let msg: MidiNoteMessage = bincode::deserialize(&midi_msg)?;
+            if msg.is_input() {
+                input_steps_remaining = input_width;
+            }
         }
 
         if input_steps_remaining > 0 {

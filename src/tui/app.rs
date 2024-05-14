@@ -18,13 +18,11 @@ use crate::{
         self, BrokerMode, CombinerArgs, DrumArgs, MetronomeArgs, MidiBrokerArgs, OutputMode,
         RunArgs,
     },
+    messages::{CombinerMessage, MetronomeMessage, MidiTuiMessage, NetworkMessage},
     utils::get_last_sent,
 };
 
-use super::{
-    messages::{CombinerMessage, MetronomeMessage, MidiTuiMessage, NetworkMessage},
-    popup::{PopupError, PopupInput},
-};
+use super::popup::{PopupError, PopupInput};
 
 const NETWORK_HISTORY_LEN: usize = 50;
 

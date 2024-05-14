@@ -86,6 +86,7 @@ pub mod data;
 pub mod errors;
 pub mod guier;
 pub mod hyper;
+pub mod messages;
 pub mod metronomer;
 pub mod midier;
 pub mod midiutils;

@@ -128,7 +128,6 @@ impl InputWindow {
                     &frequencies,
                     self.min_band,
                     self.max_band,
-                    Some(self.best_frequency),
                 )
                 .0;
             }
@@ -238,7 +237,7 @@ impl InputWindow {
         spectrum: &Spectrum,
         min_freq: f64,
         max_freq: f64,
-        current_best: Option<f64>,
+        // current_best: Option<f64>,
     ) -> FrequencyComponent {
         spectrum
             .band_pass(min_freq, max_freq)

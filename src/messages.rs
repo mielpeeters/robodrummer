@@ -4,6 +4,8 @@
 
 use std::fmt::Display;
 
+use serde::{Deserialize, Serialize};
+
 pub enum MidiTuiMessage {
     /// A message about the midi note(s) that were played
     MidiNotes(Vec<u8>),
@@ -37,6 +39,14 @@ pub enum CombinerMessage {
     Heartbeat,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub enum MidiNoteMessage {
+    /// The midi notes of the user input
+    InputNotes(Vec<u8>),
+    /// A midi note at the output
+    OutputNote,
+}
+
 impl Display for MidiTuiMessage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -64,5 +74,21 @@ impl Display for MetronomeMessage {
             MetronomeMessage::MidiOptions(m) => write!(f, "{:?}", m),
             MetronomeMessage::MidiSelected(s) => write!(f, "Midi selected: {}", s),
         }
+    }
+}
+
+impl MidiNoteMessage {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Box<dyn std::error::Error>> {
+        let msg: MidiNoteMessage = bincode::deserialize(bytes)?;
+        Ok(msg)
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        let bytes = bincode::serialize(self)?;
+        Ok(bytes)
+    }
+
+    pub fn is_input(&self) -> bool {
+        matches!(self, MidiNoteMessage::InputNotes(_))
     }
 }

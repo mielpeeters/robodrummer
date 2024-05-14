@@ -30,10 +30,11 @@ pub use train::train;
 
 use crate::activation::Activation;
 
-const METRONOME_PORT: u16 = 5432;
-const FEEL_PORT: u16 = 4321;
-const MIDI_PORT: u16 = 6543;
-const OSC_PORT: u16 = 30000;
+pub const METRONOME_PORT: u16 = 5432;
+pub const FEEL_PORT: u16 = 4321;
+pub const MIDI_PORT: u16 = 6543;
+pub const OUTPUT_PORT: u16 = 7654;
+pub const OSC_PORT: u16 = 30000;
 
 #[derive(Parser, Debug)]
 pub struct Arguments {
@@ -349,6 +350,10 @@ nest! {
         /// The device to listen on
         #[arg(long)]
         pub device: Option<String>,
+
+        /// Whether or not to output the midi messages of some channel
+        #[arg(long)]
+        pub output_publish: Option<u8>,
     }
 }
 
@@ -360,6 +365,7 @@ impl Default for MidiBrokerArgs {
             chord_size: 3,
             channel: None,
             device: None,
+            output_publish: None,
         }
     }
 }
@@ -552,6 +558,7 @@ pub struct RobotArgs {
 pub enum RobotCommand {
     Sweep,
     WaveType,
+    Delay,
 }
 
 #[derive(Args, Debug)]

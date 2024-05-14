@@ -11,12 +11,12 @@ use std::{
 
 use crate::{
     guier::Gui,
+    messages::{CombinerMessage, MidiNoteMessage},
     midier,
     robot::{self, WaveType},
-    tui::messages::CombinerMessage,
 };
 
-use midi_control::{ControlEvent, KeyEvent, MidiMessage, MidiMessageSend};
+use midi_control::{ControlEvent, KeyEvent, MidiMessage};
 
 use super::{ArpeggioArgs, CCArgs, CombinerArgs};
 use crate::arpeggio::Arpeggio;
@@ -465,7 +465,10 @@ fn arpeggio_loop(
     let (chord_tx, chord_rx) = mpsc::channel();
     let _handle = std::thread::spawn(move || loop {
         let msg = midi_sub.recv_bytes(0).unwrap();
-        let mut chord = msg.to_vec();
+        let msg: MidiNoteMessage = bincode::deserialize(&msg).unwrap();
+        let MidiNoteMessage::InputNotes(mut chord) = msg else {
+            continue;
+        };
         chord.reverse();
         if chord_tx.send(chord).is_err() {
             break;
@@ -501,7 +504,7 @@ fn arpeggio_loop(
             let msg: Vec<u8> = MidiMessage::NoteOn(
                 (arp_args.channel - 1).into(),
                 KeyEvent {
-                    key: arpeggio.next(),
+                    key: arpeggio.next_note(),
                     value: 127,
                 },
             )

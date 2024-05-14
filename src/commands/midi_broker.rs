@@ -1,11 +1,15 @@
 use std::{
     sync::mpsc::{self, Sender},
+    thread,
     time::Duration,
 };
 
-use crate::{midier, tui::messages::MidiTuiMessage};
+use crate::{
+    messages::{MidiNoteMessage, MidiTuiMessage},
+    midier,
+};
 
-use super::MidiBrokerArgs;
+use super::{MidiBrokerArgs, OUTPUT_PORT};
 use midi_control::{KeyEvent, MidiNote};
 
 const FILTER_SIZE: usize = 8;
@@ -79,7 +83,7 @@ impl<const L: usize> MidiFilter<L> {
 }
 
 fn chord(
-    rx: mpsc::Receiver<(u64, KeyEvent)>,
+    rx: mpsc::Receiver<(u64, u8, KeyEvent)>,
     publisher: zmq::Socket,
     chord_size: usize,
     tui_sender: Option<Sender<MidiTuiMessage>>,
@@ -90,10 +94,11 @@ fn chord(
     loop {
         // wait for incomming midi messages
         let received = rx.recv_timeout(Duration::from_millis(100));
-        if let Ok((timestamp, keyevent)) = received {
+        if let Ok((timestamp, _, keyevent)) = received {
             midi_filter.add(timestamp, keyevent);
             if let Some(chord) = midi_filter.chord_played() {
-                publisher.send(chord.clone(), 0)?;
+                let msg = MidiNoteMessage::InputNotes(chord.clone());
+                publisher.send(msg.to_bytes()?, 0)?;
                 // update the TUI
                 if let Some(sender) = &tui_sender {
                     if sender.send(MidiTuiMessage::MidiNotes(chord)).is_err() {
@@ -127,6 +132,21 @@ fn send_if_error<T>(
     }
 }
 
+fn publish_output(rx: mpsc::Receiver<(u64, u8, KeyEvent)>) {
+    // set up zmq pubish channel
+    let context = zmq::Context::new();
+    let publisher = context.socket(zmq::PUB).unwrap();
+    publisher.bind(&format!("tcp://*:{}", OUTPUT_PORT)).unwrap();
+
+    loop {
+        let midi_msg = rx.recv().unwrap();
+        println!("channel: {}. {:?}", midi_msg.1, midi_msg.2);
+
+        let msg = MidiNoteMessage::OutputNote.to_bytes().unwrap();
+        publisher.send(&msg, 0).unwrap();
+    }
+}
+
 /// handle midi incomping messages
 pub fn broke(
     args: MidiBrokerArgs,
@@ -148,6 +168,18 @@ pub fn broke(
             return Ok(());
         }
     };
+
+    // start the output midi sender if needed
+    if let Some(channel) = args.output_publish {
+        println!("Setting up midi robot output callback");
+        let channel = match channel {
+            0 => None,
+            c => Some(c),
+        };
+        println!("Channel: {:?}", channel);
+        let rx2 = midier::setup_midi_receiver(channel, None).unwrap();
+        thread::spawn(move || publish_output(rx2));
+    }
 
     let res = match args.mode {
         super::BrokerMode::Single => chord(rx, publisher, 1, tui_sender.clone()),

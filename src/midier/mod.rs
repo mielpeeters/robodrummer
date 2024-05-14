@@ -165,7 +165,7 @@ pub fn send_note(conn: &mut midir::MidiOutputConnection, channel: u32, note: u8,
 pub fn setup_midi_receiver(
     channel: Option<u8>,
     device: Option<String>,
-) -> Result<Receiver<(u64, KeyEvent)>, Box<dyn Error>> {
+) -> Result<Receiver<(u64, u8, KeyEvent)>, Box<dyn Error>> {
     let done = Arc::new(AtomicBool::new(false));
     let done_clone = done.clone();
     let (error_tx, error_rx) = mpsc::channel();
@@ -184,8 +184,10 @@ pub fn setup_midi_receiver(
                         }
                     }
 
+                    let c = c as u8;
+
                     // send the midi keyevent to the main thread
-                    if tx_local.send((stamp, k)).is_err() {
+                    if tx_local.send((stamp, c, k)).is_err() {
                         *no_connection_left_clone.0.lock().unwrap() = true;
                         no_connection_left_clone.1.notify_all()
                     };

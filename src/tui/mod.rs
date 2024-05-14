@@ -3,7 +3,6 @@ use crate::commands::TuiArgs;
 use std::error::Error;
 
 pub mod app;
-pub mod messages;
 pub mod popup;
 pub mod ui;
 

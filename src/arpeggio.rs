@@ -19,7 +19,7 @@ impl Arpeggio {
         }
     }
 
-    pub fn next(&mut self) -> u8 {
+    pub fn next_note(&mut self) -> u8 {
         self.current = (self.current + 1) % self.chord.len();
         self.chord[self.current]
     }

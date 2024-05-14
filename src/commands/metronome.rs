@@ -3,8 +3,8 @@ use std::sync::mpsc::Sender;
 use std::thread;
 
 use crate::guier::Gui;
+use crate::messages::{MetronomeMessage, MidiNoteMessage};
 use crate::metronomer::inputwindow::{HitAction, InputWindow};
-use crate::tui::messages::MetronomeMessage;
 use clap::Parser;
 
 use std::sync::{Arc, Condvar, Mutex};
@@ -34,10 +34,12 @@ struct Args {
 
 fn gather_data(data: Arc<(Mutex<InputWindow>, Condvar)>, midi_sub: zmq::Socket) {
     loop {
-        let msg = midi_sub.recv_msg(0).unwrap();
-        let msg = msg.as_str().unwrap();
+        let msg = midi_sub.recv_bytes(0).unwrap();
+        let msg: MidiNoteMessage = bincode::deserialize(&msg).unwrap();
 
-        log::info!("Received: {}", msg);
+        if !msg.is_input() {
+            continue;
+        }
 
         if data.0.lock().unwrap().hit(HitAction::BandedInterval(3)) {
             // notify main thread about potentially changed best_frequency
