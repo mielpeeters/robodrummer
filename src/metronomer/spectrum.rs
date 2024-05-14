@@ -1,5 +1,6 @@
 use crate::metronomer::frequency::FrequencyComponent;
 
+#[derive(Default, Clone)]
 pub struct Spectrum(pub Vec<FrequencyComponent>);
 
 impl Spectrum {
@@ -16,6 +17,62 @@ impl Spectrum {
 
     pub fn low_pass(&self, cutoff: f64) -> Spectrum {
         self.into_iter().filter(|x| x.0 < cutoff).collect()
+    }
+
+    pub fn normalize(&mut self) {
+        let max = self.0.iter().map(|x| x.1).fold(0.0_f64, |a, b| a.max(b));
+
+        for freq in self.0.iter_mut() {
+            freq.1 /= max;
+        }
+    }
+
+    pub fn spectral_sum(&mut self) {
+        let mut freqs = Vec::<f64>::new();
+
+        let mut spectrum = self.clone();
+        spectrum.normalize();
+
+        for freq in self.into_iter() {
+            freqs.push(freq.0);
+        }
+
+        freqs.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        freqs.dedup();
+
+        // get smallest difference between frequencies
+        let min_diff = freqs
+            .windows(2)
+            .map(|x| x[1] - x[0])
+            .fold(f64::INFINITY, |a, b| a.min(b));
+
+        // start adding the frequency multiples to the spectrum
+        for l in 2..5 {
+            for freq in self.into_iter() {
+                let lower_harmonic = freq.0 / l as f64;
+                let upper_harmonic = freq.0 * l as f64;
+
+                // update the spectrum by adding the value to the lower and upper
+
+                let component = spectrum
+                    .0
+                    .iter_mut()
+                    .find(|x| (x.0 - lower_harmonic).abs() <= min_diff / 2.0);
+                if let Some(component) = component {
+                    component.1 += freq.1 / 2.0;
+                }
+
+                let component = spectrum
+                    .0
+                    .iter_mut()
+                    .find(|x| (x.0 - upper_harmonic).abs() <= min_diff / 2.0);
+
+                if let Some(component) = component {
+                    component.1 += freq.1 / 2.0;
+                }
+            }
+        }
+        *self = spectrum;
     }
 }
 

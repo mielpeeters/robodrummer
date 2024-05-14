@@ -1,5 +1,6 @@
 use std::{fmt::Display, fs, path::PathBuf, time::Instant};
 
+use make_csv::{csv_entry, csv_start, python};
 use ndarray::{s, Array, Array1, Array2, ArrayView1, Axis, Dimension, Ix2};
 use ndarray_linalg::{Eig, Inverse, SVD};
 use ndarray_npy::ReadNpyExt;
@@ -9,7 +10,12 @@ use rand_distr::num_traits::Zero;
 use serde::{Deserialize, Serialize};
 use sprs::prod::mul_acc_mat_vec_csr;
 
-use crate::{activation::Activation, commands::TrainArgs, constants};
+use crate::{
+    activation::Activation,
+    commands::{TrainArgs, TrainMode},
+    constants,
+    data::load_train_data,
+};
 
 use self::data::NpyMetaData;
 
@@ -88,6 +94,13 @@ where
             *x = 0.0;
         }
     });
+}
+
+fn scale<D>(arr: &mut Array<f64, D>, factor: f64)
+where
+    D: Dimension,
+{
+    arr.iter_mut().for_each(|x| *x *= factor);
 }
 
 fn pseudo_inverse(matrix: &Array2<f64>, regularization: f64) -> Result<Array2<f64>, String> {
@@ -186,6 +199,7 @@ impl ReservoirBuilder {
         let mut rng = rand::thread_rng();
         connectivity(&mut weights_res_res, conn, &mut rng);
         connectivity(&mut weights_in_res, conn, &mut rng);
+        // scale(&mut weights_in_res, 0.001);
         connectivity(&mut weights_res_out, conn, &mut rng);
 
         if constants::OUTPUT_NEURON_DIRECT_FEEDBACK {
@@ -608,6 +622,109 @@ impl Reservoir {
 
         let result = sprs::CsMat::csr_from_dense(self.weights_res_res.view(), -1.0);
         self.weights_rr_sparse = Some(result);
+    }
+
+    /// Fully train the network
+    pub fn train(&mut self, args: &TrainArgs) -> Result<f64, Box<dyn std::error::Error>> {
+        let shift = match args.shift {
+            Some(shift) => Some((shift as f64 / args.timestep).round() as usize),
+            None => None,
+        };
+
+        let (inputs, targets) = load_train_data(
+            &args.data,
+            args.timestep,
+            args.width,
+            args.target_width,
+            shift,
+        )?;
+
+        // keep history of output weights to jump back to a previous better version
+        // to get rid of the weird training behaviour (which will need to be investigated further)
+        let mut weight_history: Array2<f64> = Array2::zeros(self.weights_res_out.dim());
+        let mut best_weights = self.weights_res_out.clone();
+        let mut lowest_error = std::f64::MAX;
+        let mut last_error = 0.0;
+
+        for i in 0..args.iter {
+            // save the history before any adjustments
+            weight_history.assign(&self.weights_res_out);
+
+            let error = match args.mode {
+                TrainMode::Inv => self.train_step(&inputs, &targets, (i as usize * 15) % 31),
+                TrainMode::Grad => self.train_mse_grad(&inputs, &targets),
+            };
+
+            // important...
+            self.reset_state();
+
+            if args.dont_stop_early {
+                continue;
+            }
+
+            if error < lowest_error {
+                best_weights = weight_history.clone();
+                lowest_error = error;
+            }
+
+            let diff = (last_error - error).abs();
+            if diff < 1e-4 {
+                log::info!("Stopping early at iteration {}", i);
+                break;
+            }
+
+            last_error = error;
+        }
+
+        self.set_weights_out(best_weights);
+
+        Ok(lowest_error)
+    }
+
+    pub fn plot<P>(&mut self, args: &TrainArgs, output: P) -> Result<(), Box<dyn std::error::Error>>
+    where
+        P: Into<PathBuf>,
+    {
+        let shift = args
+            .shift
+            .map(|shift| (shift as f64 / args.timestep).round() as usize);
+
+        let (inputs, targets) = load_train_data(
+            &args.data,
+            args.timestep,
+            args.width,
+            args.target_width,
+            shift,
+        )?;
+
+        self.reset_state();
+
+        let svg_path: PathBuf = output.into();
+        let csv_path = svg_path.with_extension("csv");
+
+        let svg_path = svg_path.to_str().unwrap();
+        let csv_path = csv_path.to_str().unwrap();
+
+        {
+            // plot target and network output graph
+            let mut wtr = csv_start!(csv_path);
+            csv_entry!(wtr <- "t", "nw_0", "target_0", "input_0");
+
+            (0..inputs.len()).for_each(|i| {
+                self.forward(&inputs[i]);
+                match &targets[i] {
+                    Some(t) => {
+                        csv_entry!(wtr <- i, self.output[0], t[0], inputs[i][0]);
+                    }
+                    None => {
+                        csv_entry!(wtr <- i, self.output[0], "", inputs[i][0]);
+                    }
+                }
+            });
+        }
+        python!("plot.py", csv_path, svg_path);
+
+        Ok(())
     }
 }
 

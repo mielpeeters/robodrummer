@@ -5,9 +5,9 @@ use clap::Parser;
 
 use robodrummer::commands::broke;
 use robodrummer::commands::combine;
+use robodrummer::commands::dev;
 use robodrummer::commands::gendata;
 use robodrummer::commands::metronome;
-use robodrummer::commands::robot;
 use robodrummer::commands::run;
 use robodrummer::commands::train;
 use robodrummer::commands::tui;
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         robodrummer::commands::Command::MidiBroker(m) => broke(m, None),
         robodrummer::commands::Command::Combine(c) => combine(c, None),
         robodrummer::commands::Command::Tui(t) => tui(t),
-        robodrummer::commands::Command::Robot(r) => robot(r),
+        robodrummer::commands::Command::Dev(d) => dev(d),
         robodrummer::commands::Command::Metronome(m) => metronome(m, None),
     }
 }

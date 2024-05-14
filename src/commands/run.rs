@@ -103,7 +103,7 @@ pub fn run(
         publisher.send((new_output as f32).to_be_bytes().as_slice(), 0)?;
         oscutil::send_osc_msg(
             "/robodrummer",
-            vec![osc::OscType::Float(new_output as f32)],
+            vec![rosc::OscType::Float(new_output as f32)],
             &osc_sock,
         );
 

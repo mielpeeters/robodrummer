@@ -9,6 +9,11 @@ file = "out.csv"
 if len(sys.argv) > 1:
     file = sys.argv[1]
 
+output = None
+if len(sys.argv) > 2:
+    # this means we'll write the plot to a file
+    output = sys.argv[2]
+
 df = pd.read_csv(file)
 
 df = df.set_index('t')
@@ -25,35 +30,9 @@ except:
     pass
 
 
-# plt.savefig("plot.png")
-plt.show()
+if output:
+    plt.savefig(output, format='svg', dpi=300)
 
-fig = plt.figure()
+else:
+    plt.show()
 
-# nw = df["nw_0"]
-# N = len(nw)
-# dt = 1
-
-# acc = nw.values.flatten()
-
-# fft = scipy.fftpack.rfft(acc) * dt
-# freq = scipy.fftpack.rfftfreq(N, d=dt)
-
-# FFT = abs(fft)
-
-# plt.plot(freq, FFT)
-
-# nw = df["target_0"]
-# N = len(nw)
-# dt = 1
-
-# acc = nw.values.flatten()
-
-# fft = scipy.fftpack.rfft(acc) * dt
-# freq = scipy.fftpack.rfftfreq(N, d=dt)
-
-# FFT = abs(fft)
-
-# plt.plot(freq, FFT)
-
-# plt.show()

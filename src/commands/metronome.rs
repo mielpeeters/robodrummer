@@ -12,7 +12,7 @@ use std::sync::{Arc, Condvar, Mutex};
 use super::MetronomeArgs;
 
 // Current fft size is 2^10 = 1024
-const FFT_SIZE_POW: u32 = 10;
+const FFT_SIZE_POW: u32 = 11;
 const FFT_SIZE: usize = 2i32.pow(FFT_SIZE_POW) as usize;
 
 const SAMPLE_PERIOD: f64 = 0.05;

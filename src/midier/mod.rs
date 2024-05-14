@@ -24,6 +24,42 @@ fn ask(question: &str) -> usize {
     answer.trim().parse::<usize>().unwrap()
 }
 
+pub fn create_midi_output(name: &str) -> Result<midir::MidiOutput, errors::MidiError> {
+    let Ok(output) = midir::MidiOutput::new(name) else {
+        return Err(errors::MidiError::CantCreateMidiOut);
+    };
+
+    Ok(output)
+}
+
+pub fn connect_output(
+    output: midir::MidiOutput,
+) -> Result<midir::MidiOutputConnection, errors::MidiError> {
+    let ports = output.ports();
+
+    let num = {
+        println!("Available Midi ports to connect to:");
+        for (i, port) in ports.iter().enumerate() {
+            println!("\t{i}: {}", output.port_name(port).unwrap());
+        }
+        let res = ask("Select one: ");
+        if res >= ports.len() {
+            return Err(errors::MidiError::PortNotOpen);
+        }
+        res
+    };
+
+    let name = output.port_name(ports.get(num).unwrap()).unwrap();
+
+    let Ok(conn) = output.connect(ports.get(num).unwrap(), "midier output port") else {
+        return Err(errors::MidiError::CantConnectMidi);
+    };
+
+    println!("Connected to Midi device \x1b[1m{}\x1b[0m!", name);
+
+    Ok(conn)
+}
+
 pub fn create_midi_output_and_connect(
     device: Option<String>,
 ) -> Result<midir::MidiOutputConnection, errors::MidiError> {
@@ -116,19 +152,14 @@ pub fn send_beat(conn: &mut midir::MidiOutputConnection, channel: u32) {
         _ => midi_control::Channel::Ch1,
     };
 
-    conn.send_message(midi_control::note_on(ch, 60, 100))
-        .unwrap();
+    let msg: Vec<u8> = midi_control::note_on(ch, 60, 100).into();
+    conn.send(msg.as_slice()).unwrap();
 }
 
 pub fn send_note(conn: &mut midir::MidiOutputConnection, channel: u32, note: u8, velocity: u8) {
-    let ch = match channel {
-        1 => midi_control::Channel::Ch1,
-        2 => midi_control::Channel::Ch2,
-        _ => midi_control::Channel::Ch1,
-    };
-
-    conn.send_message(midi_control::note_on(ch, note, velocity))
-        .unwrap();
+    let ch = midi_control::Channel::from(channel as u8);
+    let msg: Vec<u8> = midi_control::note_on(ch, note, velocity).into();
+    conn.send(msg.as_slice()).unwrap();
 }
 
 pub fn setup_midi_receiver(

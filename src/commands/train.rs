@@ -126,7 +126,7 @@ pub fn train(args: super::TrainArgs) -> Result<(), Box<dyn Error>> {
     let test_inputs = &inputs[(inputs.len() as f64 * args.split) as usize..];
     let targets = &targets[0..train_len];
 
-    let pb = create_progress_bar(args.iter);
+    let pb = create_progress_bar("Training...", args.iter);
 
     let mut errors = Vec::with_capacity(args.iter as usize);
 

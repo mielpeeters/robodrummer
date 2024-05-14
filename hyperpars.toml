@@ -1,0 +1,19 @@
+[n_neurons]
+min = 95
+max = 120
+count = 1
+
+[alpha]
+min = 0.10
+max = 0.30
+count = 1
+
+[rho]
+min = 0.95
+max = 1.1
+count = 1
+
+[lambda]
+min = 0.002
+max = 0.1
+count = 1

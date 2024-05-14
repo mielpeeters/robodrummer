@@ -87,13 +87,14 @@ pub fn start(
     send_beat: Arc<AtomicBool>,
     wave: WaveType,
 ) -> (Stream, SupportedStreamConfig, JoinHandle<()>) {
-    let host = cpal::host_from_id(
-        cpal::available_hosts()
-            .into_iter()
-            .find(|id| *id == cpal::HostId::Jack)
-            .expect("features = ['jack'] should be added to the Cargo.toml file"),
-    )
-    .expect("jack host should be available");
+    // let host = cpal::host_from_id(
+    //     cpal::available_hosts()
+    //         .into_iter()
+    //         .find(|id| *id == cpal::HostId::Jack)
+    //         .expect("features = ['jack'] should be added to the Cargo.toml file"),
+    // )
+    // .expect("jack host should be available");
+    let host = cpal::default_host();
 
     let device = host.default_output_device().unwrap();
 

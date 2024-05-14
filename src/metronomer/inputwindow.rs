@@ -8,9 +8,9 @@ use crate::metronomer::{frequency::FrequencyComponent, spectrum::Spectrum};
 const MINIMUM_HITS_FOR_FOURIER: u32 = 5;
 const MINIMUM_FREQUENCY: f64 = 40.0 / 60.0;
 const MAXIMUM_FREQUENCY: f64 = 210.0 / 60.0;
-const WINDOW_LENGTH: f64 = 10.0;
+const WINDOW_LENGTH: f64 = 5.0;
 
-const BAND_WIDTH: f64 = 0.1;
+const BAND_WIDTH: f64 = 0.3;
 
 /// The InputWindow keeps memory of the input hits and fourier related data
 pub struct InputWindow {
@@ -100,7 +100,8 @@ impl InputWindow {
             / self.sample_period;
 
         // implement a queue behaviour with the window
-        self.window.push_front(current_sampling_period as u128);
+        self.window
+            .push_front(current_sampling_period.round() as u128);
         self.window.pop_back();
 
         // calculate fourier only when the action asks for it and we have enough hits
@@ -115,9 +116,12 @@ impl InputWindow {
                 }
 
                 // if we can't find dominant frequency, we don't do anything
-                let Some(frequencies) = self.fft() else {
+                let Some(mut frequencies) = self.fft() else {
                     return false;
                 };
+
+                // add frequency multiples to the spectrum to get fundamentals knowledge
+                frequencies.spectral_sum();
 
                 // update our best estimated frequency
                 self.best_frequency = InputWindow::dominant_frequency_between(
@@ -177,6 +181,8 @@ impl InputWindow {
             // "time" being in terms of sampling periods
             let current_time = self.window[0] - i as u128;
 
+            let to_scale = |i: usize| 1.0 - (i as f64 * self.sample_period / WINDOW_LENGTH);
+
             let mut j = current_window_index;
             let val = loop {
                 match self.window[j].cmp(&current_time) {
@@ -192,7 +198,13 @@ impl InputWindow {
                 j += 1;
             };
 
-            buffer.insert(0, Complex { re: val, im: 0.0 });
+            buffer.insert(
+                0,
+                Complex {
+                    re: val * to_scale(j),
+                    im: 0.0,
+                },
+            );
         }
 
         if local_hit_count < MINIMUM_HITS_FOR_FOURIER {
@@ -228,43 +240,22 @@ impl InputWindow {
         max_freq: f64,
         current_best: Option<f64>,
     ) -> FrequencyComponent {
-        let max = spectrum
-            .band_pass(min_freq / 4.0, max_freq * 2.0)
+        spectrum
+            .band_pass(min_freq, max_freq)
             .into_iter()
             .max_by(|one, two| one.partial_cmp(two).expect("oops"))
-            .unwrap();
-
-        // if no current best is given, look around 120bpm
-        let current_best = current_best.unwrap_or(2.0);
-
-        let maxs: Vec<_> = (-2..2)
-            .map(|i| FrequencyComponent(max.0 * 2.0f64.powi(i), max.1))
-            .collect();
-
-        let max = maxs
-            .into_iter()
-            .min_by(|one, two| {
-                (one.0 - current_best)
-                    .abs()
-                    .partial_cmp(&(two.0 - current_best).abs())
-                    .unwrap()
-            })
-            .unwrap();
-
-        if max.0 > max_freq || max.0 < min_freq {
-            return FrequencyComponent(current_best, 1.0);
-        }
-
-        max
+            .unwrap()
     }
 
     pub fn plot_decision(&mut self) {
-        let frequencies = match self.fft() {
+        let mut frequencies = match self.fft() {
             Some(f) => f,
             None => {
                 return;
             }
         };
+
+        frequencies.spectral_sum();
 
         {
             let mut wtr = csv_start!("out.csv");
@@ -278,7 +269,7 @@ impl InputWindow {
                 csv_entry!(wtr <- i as f64 * self.sample_period, val.re);
             }
         }
-        let _ = python!("plot.py");
+        let _ = python!("plot_freq.py");
 
         {
             let mut wtr = csv_start!("out.csv");
@@ -288,7 +279,7 @@ impl InputWindow {
             }
         }
 
-        let _ = python!("plot.py");
+        let _ = python!("plot_freq.py");
     }
 }
 

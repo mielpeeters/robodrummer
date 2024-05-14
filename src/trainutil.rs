@@ -30,11 +30,15 @@ pub fn add_data(container: &mut Vec<Array1<f64>>, data: &[f64]) {
     container.push(Array1::from_iter(data.iter().cloned()));
 }
 
-pub fn create_progress_bar(len: u64) -> ProgressBar {
+pub fn create_progress_bar(task: &str, len: u64) -> ProgressBar {
     let pb = ProgressBar::new(len);
     pb.set_style(
         ProgressStyle::with_template(
-            "Training...  {bar:40.green/black}  {pos} / {len}  eta: {eta}",
+            format!(
+                "{}  {{bar:40.green/black}}  {{pos}} / {{len}}  eta: {{eta}}",
+                task
+            )
+            .as_str(),
         )
         .unwrap()
         .progress_chars("━━─"),

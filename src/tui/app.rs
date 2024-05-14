@@ -328,6 +328,7 @@ impl App {
                     self.mode = AppMode::Normal;
                 }
             },
+            // COMBINER
             3 => match self.mode {
                 AppMode::Setup(0, _) => {
                     self.combiner_args.device = Some(self.input.value().to_string());
@@ -344,11 +345,27 @@ impl App {
                         _ => todo!(),
                         // TODO: implement the others
                     };
-                    self.question = "How much to subdivide the metronome beat?".into();
+                    self.question = "Select an output note".into();
                     self.input.reset();
                     self.mode = AppMode::Setup(2, false);
                 }
                 AppMode::Setup(2, _) => {
+                    let note: Result<u8, _> = self.input.value().parse();
+                    check_parse!(self, note);
+                    self.combiner_args.note = note.unwrap();
+                    self.question = "Enter a threshold value".into();
+                    self.input.reset();
+                    self.mode = AppMode::Setup(3, false);
+                }
+                AppMode::Setup(3, _) => {
+                    let threshold: Result<f32, _> = self.input.value().parse();
+                    check_parse!(self, threshold);
+                    self.combiner_args.threshold = threshold.unwrap();
+                    self.question = "How much to subdivide the metronome beat?".into();
+                    self.input.reset();
+                    self.mode = AppMode::Setup(4, false);
+                }
+                AppMode::Setup(4, _) => {
                     let subdivision = self.input.value().parse();
                     check_parse!(self, subdivision);
                     self.combiner_args.subdivision = subdivision.unwrap();

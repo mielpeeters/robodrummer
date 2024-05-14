@@ -157,6 +157,7 @@ fn uniform(density: f64) -> Box<dyn Fn(f64) -> Vec<f64>> {
     Box::new(func)
 }
 
+#[allow(unused)]
 fn chebyshev(density: f64, offset: f64) -> Box<dyn Fn(f64) -> Vec<f64>> {
     let func = move |width: f64| {
         // amount of points to generate
@@ -351,7 +352,7 @@ fn patterns_to_csv(
         Some(d) => {
             let mut res = vec![];
             for _ in patterns {
-                res.push(chebyshev(d as f64 / mspb_target, args.offset));
+                res.push(uniform(d as f64 / mspb_target));
             }
             res
         }

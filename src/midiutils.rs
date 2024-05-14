@@ -14,8 +14,8 @@ pub fn send_beat(conn: &mut midir::MidiOutputConnection, num: u32) {
         _ => midi_control::Channel::Ch1,
     };
 
-    conn.send_message(midi_control::note_on(ch, 60, 100))
-        .unwrap();
+    let msg: Vec<u8> = midi_control::note_on(ch, 60, 100).into();
+    conn.send(msg.as_slice()).unwrap();
 }
 
 pub fn play_model(mut model: Box<Reservoir>) {

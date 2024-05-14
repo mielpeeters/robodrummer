@@ -5,7 +5,7 @@ use std::{
         mpsc::{self, Sender},
         Arc, Mutex,
     },
-    thread::sleep,
+    thread::{self, sleep},
     time::{Duration, Instant},
 };
 
@@ -63,6 +63,47 @@ impl NetworkPeriod {
     }
 }
 
+type Prediction = (Instant, f32);
+
+pub struct PredictionBuffer {
+    pub buffer: VecDeque<Prediction>,
+}
+
+impl PredictionBuffer {
+    pub fn new(shift: f64, timestep: f64) -> Self {
+        // max needed size for delay compenstation, add 10 for why-not's sake
+        let size = (shift / timestep) as usize + 10;
+
+        let mut deque = VecDeque::with_capacity(size);
+        let instant = Instant::now();
+
+        for _ in 0..size {
+            deque.push_back((instant, 0.0));
+        }
+
+        Self { buffer: deque }
+    }
+
+    pub fn add(&mut self, prediction: Prediction) {
+        self.buffer.pop_back();
+        self.buffer.push_front(prediction);
+    }
+
+    pub fn get_closest(&self, instant: Instant) -> f32 {
+        let mut closest = self.buffer.front().unwrap();
+        let mut min_diff = instant.duration_since(closest.0).as_secs_f64();
+        for pred in self.buffer.iter() {
+            let diff = instant.duration_since(pred.0).as_secs_f64();
+            if diff < min_diff {
+                min_diff = diff;
+                closest = pred;
+            }
+        }
+
+        closest.1
+    }
+}
+
 /// Non-blocking receiving calls to the receiver until the last value has been retreived
 fn get_last_sent<T>(rx: &mpsc::Receiver<T>) -> Option<T> {
     let mut last = None;
@@ -76,8 +117,22 @@ fn threshold_nw(nw_output: f32, threshold: f32) -> bool {
     nw_output > threshold
 }
 
+#[allow(unused)]
 fn freq_subd_to_wait(time_wait: f64, subd: u8) -> f64 {
     time_wait / f64::from(subd)
+}
+
+fn ms_to_dur(ms: f64) -> Duration {
+    Duration::from_secs_f64(ms / 1000.0)
+}
+
+fn s_to_dur(s: f64) -> Duration {
+    Duration::from_secs_f64(s)
+}
+
+fn show_time(start: Instant, time: Instant) -> String {
+    let elapsed = time - start;
+    format!("{:.1} ms", elapsed.as_secs_f64() * 1000.0)
 }
 
 fn drum_robot_loop(
@@ -90,78 +145,101 @@ fn drum_robot_loop(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // inform the user of robotic output
     gui.add_row("Robot", "");
-    gui.add_row("Network", 0);
-    gui.add_row("Wait Secs", 0);
+    gui.add_row("Now", 0);
+    gui.add_row("Quantize Interval", 0);
+    gui.add_row("Sent Beat For Time", 0);
+    gui.add_row("metro", 0);
 
     // create the beat sender
     let beat_send = Arc::new(AtomicBool::new(false));
 
     // start the output stream
-    let _stream = robot::start(Arc::clone(&beat_send), WaveType::Pulse(0.3));
+    let _stream = robot::start(Arc::clone(&beat_send), WaveType::Saw(0.15));
 
     // wait for the first metronome signal
-    let mut metro = metro_rx.recv()?;
-    let mut nw_output = 0.0;
+    let quantization_interval = metro_rx.recv()? / (args.subdivision as f64);
+    let mut quantization_interval = s_to_dur(quantization_interval);
 
-    // create an agenda of future events
-    let output_agenda: Arc<Mutex<VecDeque<Instant>>> = Arc::new(Mutex::new(VecDeque::new()));
+    // Get the output delay duration
+    let delay = ms_to_dur(drum_args.delay);
 
-    // start the output thread using the output agenda
-    let local_output_agenda = Arc::clone(&output_agenda);
-    let _handle = std::thread::spawn(move || loop {
-        // NOTE: this assumes that the outputs are ordered
-        let front_val = {
-            let mut out = local_output_agenda.lock().unwrap();
-            out.pop_front()
-        };
-        match front_val {
-            Some(time) => {
-                let now = Instant::now();
-                let time_left = time.checked_duration_since(now);
-                if let Some(wait) = time_left {
-                    // TMP: this one should be made a lot more accurate probably
-                    sleep(wait);
-                }
-                beat_send.store(true, Ordering::Relaxed);
+    let mut next_metro = Instant::now() + quantization_interval - delay;
+
+    let predictions = Arc::new(Mutex::new(PredictionBuffer::new(
+        drum_args.shift,
+        drum_args.timestep,
+    )));
+
+    let loop_time = Duration::from_millis(5);
+    let mut iter = 0;
+
+    let start = Instant::now();
+
+    let predictions_clone = Arc::clone(&predictions);
+    let _handle = thread::spawn(move || {
+        loop {
+            let now = Instant::now();
+            // get last network output
+            if let Some(nw) = get_last_sent(&nw_rx) {
+                let future = now + ms_to_dur(drum_args.shift);
+                predictions_clone.lock().unwrap().add((future, nw));
             }
-            None => {
-                // NOTE: this could lead to some additional delays
-                sleep(Duration::from_millis(5));
-            }
+
+            sleep(Duration::from_millis(1));
         }
     });
 
     loop {
-        // check if we need to send an output in some time
-        nw_output = get_last_sent(&nw_rx).unwrap_or(nw_output);
-        gui.update_row("Network", &nw_output);
-        if threshold_nw(nw_output, args.threshold) {
-            let now = Instant::now();
-            let next_time = now + Duration::from_secs_f64(drum_args.offset)
-                - Duration::from_secs_f64(drum_args.delay);
-            let mut out = output_agenda.lock().unwrap();
-            out.push_back(next_time);
-            drop(out);
+        let now = Instant::now();
+
+        gui.update_row("Now", &show_time(start, now));
+
+        // check if we are on a quantized interval
+        if now > next_metro {
+            // get the prediction value at Instant::now() + delay
+            let prediction = predictions.lock().unwrap().get_closest(now + delay);
+
+            // send the beat if the network output is above threshold
+            if threshold_nw(prediction, args.threshold) {
+                beat_send.store(true, Ordering::Relaxed);
+                gui.update_row("Sent Beat For Time", &show_time(start, now + delay));
+            }
+
+            // update the next metronome instant
+            next_metro += quantization_interval;
         }
 
-        // get the last metronome reading
-        metro = get_last_sent(&metro_rx).unwrap_or(metro);
-        let wait_secs = freq_subd_to_wait(metro, args.subdivision);
-        gui.update_row("Wait Secs", &wait_secs);
-        gui.show();
+        // update the metronome value if needed
+        quantization_interval = get_last_sent(&metro_rx)
+            .map(|m| {
+                let res = ms_to_dur(m * 1000.0 / (args.subdivision as f64));
+                gui.update_row(
+                    "Quantize Interval",
+                    &format!("{:.1} ms", res.as_secs_f64() * 1000.0),
+                );
+                gui.show();
+                res
+            })
+            .unwrap_or(quantization_interval);
 
-        // send output to tui if needed
-        if let Some(sender) = &tui_sender {
-            if sender
-                .send(CombinerMessage::Output((0.0, nw_output.into())))
-                .is_err()
-            {
-                // stop thread if sender is disconnected
-                break;
+        if iter % 10 == 0 {
+            if let Some(sender) = &tui_sender {
+                if sender.send(CombinerMessage::Heartbeat).is_err() {
+                    break;
+                }
             }
         }
 
-        sleep(Duration::from_secs_f64(wait_secs));
+        if iter % 2 == 0 {
+            gui.show();
+        }
+
+        iter += 1;
+
+        let remaining = loop_time - now.elapsed();
+        if remaining > Duration::from_secs(0) {
+            sleep(remaining);
+        }
     }
 
     Ok(())
@@ -206,7 +284,7 @@ fn drum_loop(
         }
 
         if playing {
-            midier::send_note(&mut midi_out, 1, 51, 50);
+            midier::send_note(&mut midi_out, 3 - 1, args.note, 100);
         }
 
         waiting_time = get_last_sent(&wait_rx).unwrap_or(waiting_time);
@@ -330,7 +408,8 @@ fn cc_loop(
 
         log::info!("Sending message: {:?}", &msg);
 
-        if let Err(e) = midi_out.send_message(msg) {
+        let buffer: Vec<u8> = msg.into();
+        if let Err(e) = midi_out.send(buffer.as_slice()) {
             log::error!("Error sending midi message: {}", e);
         };
 
@@ -419,29 +498,29 @@ fn arpeggio_loop(
                 gui.show();
             };
 
-            midi_out.lock().unwrap().send_message(MidiMessage::NoteOn(
+            let msg: Vec<u8> = MidiMessage::NoteOn(
                 (arp_args.channel - 1).into(),
                 KeyEvent {
                     key: arpeggio.next(),
                     value: 127,
                 },
-            ))?;
+            )
+            .into();
+            midi_out.lock().unwrap().send(msg.as_slice())?;
 
             let midi_local = Arc::clone(&midi_out);
             let to_stop = arpeggio.chord[arpeggio.current];
             let _handle = std::thread::spawn(move || {
                 sleep(Duration::from_secs_f32(arpeggio.duration));
-                midi_local
-                    .lock()
-                    .unwrap()
-                    .send_message(MidiMessage::NoteOff(
-                        (arp_args.channel - 1).into(),
-                        KeyEvent {
-                            key: to_stop,
-                            value: 0,
-                        },
-                    ))
-                    .unwrap();
+                let msg: Vec<u8> = MidiMessage::NoteOff(
+                    (arp_args.channel - 1).into(),
+                    KeyEvent {
+                        key: to_stop,
+                        value: 0,
+                    },
+                )
+                .into();
+                midi_local.lock().unwrap().send(msg.as_slice()).unwrap();
             });
         }
 

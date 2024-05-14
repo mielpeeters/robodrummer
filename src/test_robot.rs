@@ -13,7 +13,7 @@ use crate::{
     utils::get_last_sent_timeout,
 };
 
-use super::{RobotArgs, RobotCommand};
+use super::commands::{RobotArgs, RobotCommand};
 
 const TIMEOUT: Duration = Duration::from_millis(500);
 const BEAT_INIT: Duration = Duration::from_millis(500);

@@ -4,14 +4,14 @@
 
 mod combine;
 mod completions;
+mod dev;
 mod gendata;
 mod metronome;
 mod midi_broker;
 mod run;
-mod test_robot;
 mod train;
 
-use std::{fmt::Display, num::NonZeroU8};
+use std::{fmt::Display, num::NonZeroU8, path::PathBuf};
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use clap_complete::Shell;
@@ -21,11 +21,11 @@ use serde::{Deserialize, Serialize};
 pub use crate::tui::start_tui as tui;
 pub use combine::combine;
 pub use completions::update_completions;
+pub use dev::dev;
 pub use gendata::gendata;
 pub use metronome::metronome;
 pub use midi_broker::broke;
 pub use run::run;
-pub use test_robot::robot;
 pub use train::train;
 
 use crate::activation::Activation;
@@ -52,7 +52,8 @@ pub enum Command {
     Metronome(MetronomeArgs),
     Combine(CombinerArgs),
     Tui(TuiArgs),
-    Robot(RobotArgs),
+    Dev(DevArgs),
+    // Robot(RobotArgs),
 }
 
 #[derive(Args, Debug, Clone)]
@@ -382,15 +383,15 @@ impl MidiBrokerArgs {
 pub struct CombinerArgs {
     /// port of the metronome publisher
     #[arg(short, long, default_value_t = METRONOME_PORT)]
-    metro_port: u16,
+    pub metro_port: u16,
 
     /// port of the rhythmic feel publisher
     #[arg(short, long, default_value_t = FEEL_PORT)]
-    feel_port: u16,
+    pub feel_port: u16,
 
     /// threshold for model output selection
     #[arg(short, long, default_value_t = 0.5)]
-    threshold: f32,
+    pub threshold: f32,
 
     /// Subdivision of metronome beat
     #[arg(short, long, default_value_t = 1)]
@@ -403,6 +404,10 @@ pub struct CombinerArgs {
     /// The MIDI device (if not given, is interactively asked)
     #[arg(long)]
     pub device: Option<String>,
+
+    /// The midi output note number
+    #[arg(long, default_value_t = 60)]
+    pub note: u8,
 }
 
 impl Default for CombinerArgs {
@@ -414,6 +419,7 @@ impl Default for CombinerArgs {
             subdivision: 4,
             output: OutputMode::default(),
             device: None,
+            note: 60,
         }
     }
 }
@@ -458,13 +464,17 @@ nest! {
                 /// This does include delay compensation.
                 pub Robot,
             },
-        /// The offset at which the rhythmic activity model was trained
+        /// The shift at which the rhythmic activity model was trained [ms]
         #[arg(short, long, default_value_t = 0.0)]
-        pub offset: f64,
+        pub shift: f64,
 
-        /// The amount of delay compensation to apply
+        /// The amount of delay compensation to apply [ms]
         #[arg(short, long, default_value_t = 0.0)]
         pub delay: f64,
+
+        /// The timestep of the network output [ms]
+        #[arg(short, long, default_value_t = 2.0)]
+        pub timestep: f64,
     }
 }
 
@@ -519,6 +529,19 @@ pub struct ArpeggioArgs {
 pub struct TuiArgs {}
 
 #[derive(Args, Debug)]
+pub struct DevArgs {
+    /// the test to run
+    #[command(subcommand)]
+    pub command: DevCommand,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum DevCommand {
+    Robot(RobotArgs),
+    Hyper(HyperArgs),
+}
+
+#[derive(Args, Debug)]
 pub struct RobotArgs {
     /// The test to run
     #[command(subcommand)]
@@ -529,6 +552,13 @@ pub struct RobotArgs {
 pub enum RobotCommand {
     Sweep,
     WaveType,
+}
+
+#[derive(Args, Debug)]
+pub struct HyperArgs {
+    /// path to parameter file
+    #[arg(short, long)]
+    pub path: PathBuf,
 }
 
 #[derive(Args, Debug)]

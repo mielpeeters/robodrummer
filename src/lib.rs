@@ -78,13 +78,14 @@
 * know which beats will be played and which won't.
 */
 
-mod activation;
-mod arpeggio;
+pub mod activation;
+pub mod arpeggio;
 pub mod commands;
 pub mod constants;
 pub mod data;
-mod errors;
-mod guier;
+pub mod errors;
+pub mod guier;
+pub mod hyper;
 pub mod metronomer;
 pub mod midier;
 pub mod midiutils;
@@ -92,6 +93,7 @@ pub mod oscutil;
 pub mod reservoir;
 pub mod robot;
 pub mod series;
+pub mod test_robot;
 pub mod trainutil;
-mod tui;
-mod utils;
+pub mod tui;
+pub mod utils;
