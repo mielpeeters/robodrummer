@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"macro":["add_data"],"mod":["commands","constants","data","midier","midiutils","oscutil","reservoir","robot","series","trainutil"]};
