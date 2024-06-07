@@ -136,7 +136,9 @@ fn publish_output(rx: mpsc::Receiver<(u64, u8, KeyEvent)>) {
     // set up zmq pubish channel
     let context = zmq::Context::new();
     let publisher = context.socket(zmq::PUB).unwrap();
-    publisher.bind(&format!("tcp://*:{}", OUTPUT_PORT)).unwrap();
+    publisher
+        .bind(&format!("ipc:///tmp/zmq_robodrummer_{}", OUTPUT_PORT))
+        .unwrap();
 
     loop {
         let midi_msg = rx.recv().unwrap();
@@ -155,10 +157,10 @@ pub fn broke(
     // set up zmq pubish channel
     let context = zmq::Context::new();
     let publisher = context.socket(zmq::PUB)?;
-    publisher.bind(&format!("tcp://*:{}", args.port))?;
+    publisher.bind(&format!("ipc:///tmp/zmq_robodrummer_{}", args.port))?;
 
     // set up midi input connection
-    let rx = midier::setup_midi_receiver(args.channel, args.device);
+    let rx = midier::setup_midi_receiver(args.channel, args.key_in, args.device);
 
     send_if_error(tui_sender.as_ref(), &rx);
 
@@ -177,7 +179,7 @@ pub fn broke(
             c => Some(c),
         };
         println!("Channel: {:?}", channel);
-        let rx2 = midier::setup_midi_receiver(channel, None).unwrap();
+        let rx2 = midier::setup_midi_receiver(channel, args.key_out, None).unwrap();
         thread::spawn(move || publish_output(rx2));
     }
 

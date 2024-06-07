@@ -2,7 +2,7 @@ use std::{thread, time::Duration};
 
 use crate::midier::create_midi_output_and_connect;
 use make_csv::{csv_entry, csv_start, csv_stop, python};
-use midi_control::MidiMessageSend;
+// use midi_control::MidiMessageSend;
 use ndarray::Array1;
 
 use crate::{add_data, reservoir::Reservoir, series::*, trainutil::add_series_data};

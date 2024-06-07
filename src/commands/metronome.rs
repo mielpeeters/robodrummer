@@ -60,11 +60,14 @@ pub fn metronome(
 
     let context = zmq::Context::new();
     let publisher = context.socket(zmq::PUB)?;
-    publisher.bind(&format!("tcp://*:{}", args.metronome_port))?;
+    publisher.bind(&format!(
+        "ipc:///tmp/zmq_robodrummer_{}",
+        args.metronome_port
+    ))?;
 
     // subscriber for midi data
     let midi_sub = context.socket(zmq::SUB)?;
-    midi_sub.connect(&format!("tcp://localhost:{}", args.midi_port))?;
+    midi_sub.connect(&format!("ipc:///tmp/zmq_robodrummer_{}", args.midi_port))?;
     midi_sub.set_subscribe(b"")?;
 
     // writer for input data

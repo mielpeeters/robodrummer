@@ -11,7 +11,7 @@ use std::{
     thread,
 };
 
-use midi_control::{KeyEvent, MidiMessage, MidiMessageSend};
+use midi_control::{KeyEvent, MidiMessage};
 
 fn ask(question: &str) -> usize {
     print!("\n{question}");
@@ -162,10 +162,12 @@ pub fn send_note(conn: &mut midir::MidiOutputConnection, channel: u32, note: u8,
     conn.send(msg.as_slice()).unwrap();
 }
 
+type MidiNote = (u64, u8, KeyEvent);
 pub fn setup_midi_receiver(
     channel: Option<u8>,
+    key: Option<u8>,
     device: Option<String>,
-) -> Result<Receiver<(u64, u8, KeyEvent)>, Box<dyn Error>> {
+) -> Result<Receiver<MidiNote>, Box<dyn Error>> {
     let done = Arc::new(AtomicBool::new(false));
     let done_clone = done.clone();
     let (error_tx, error_rx) = mpsc::channel();
@@ -185,6 +187,18 @@ pub fn setup_midi_receiver(
                     }
 
                     let c = c as u8;
+
+                    // check if the key matches
+                    if let Some(desired_key) = key {
+                        if k.key != desired_key {
+                            return;
+                        }
+                    }
+
+                    // check if velocity > 0
+                    if k.value == 0 {
+                        return;
+                    }
 
                     // send the midi keyevent to the main thread
                     if tx_local.send((stamp, c, k)).is_err() {

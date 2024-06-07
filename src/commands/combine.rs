@@ -89,18 +89,27 @@ impl PredictionBuffer {
         self.buffer.push_front(prediction);
     }
 
-    pub fn get_closest(&self, instant: Instant) -> f32 {
+    pub fn get_closest(&self, instant: Instant) -> (f32, f64) {
         let mut closest = self.buffer.front().unwrap();
-        let mut min_diff = instant.duration_since(closest.0).as_secs_f64();
+        let mut min_diff = duration_pos_neg(closest.0, instant);
         for pred in self.buffer.iter() {
-            let diff = instant.duration_since(pred.0).as_secs_f64();
+            let diff = duration_pos_neg(pred.0, instant);
             if diff < min_diff {
                 min_diff = diff;
                 closest = pred;
             }
         }
 
-        closest.1
+        (closest.1, min_diff)
+    }
+}
+
+fn duration_pos_neg(moment_one: Instant, moment_two: Instant) -> f64 {
+    let diff = moment_one.duration_since(moment_two).as_secs_f64();
+    if diff == 0.0 {
+        moment_two.duration_since(moment_one).as_secs_f64()
+    } else {
+        diff
     }
 }
 
@@ -176,12 +185,14 @@ fn drum_robot_loop(
     let start = Instant::now();
 
     let predictions_clone = Arc::clone(&predictions);
+    let shift = ms_to_dur(drum_args.shift);
     let _handle = thread::spawn(move || {
         loop {
             let now = Instant::now();
             // get last network output
             if let Some(nw) = get_last_sent(&nw_rx) {
-                let future = now + ms_to_dur(drum_args.shift);
+                let future = now + shift;
+                log::debug!("Got prediction for {}", show_time(start, future));
                 predictions_clone.lock().unwrap().add((future, nw));
             }
 
@@ -197,16 +208,24 @@ fn drum_robot_loop(
         // check if we are on a quantized interval
         if now > next_metro {
             // get the prediction value at Instant::now() + delay
-            let prediction = predictions.lock().unwrap().get_closest(now + delay);
+            let (prediction, err) = predictions.lock().unwrap().get_closest(now + delay);
 
-            // send the beat if the network output is above threshold
-            if threshold_nw(prediction, args.threshold) {
-                beat_send.store(true, Ordering::Relaxed);
-                gui.update_row("Sent Beat For Time", &show_time(start, now + delay));
+            // HACK: this threshold could be smarter
+            if err * 1000.0 < drum_args.timestep * 5.0 {
+                log::debug!(
+                    "Prediction: {:.2}, Error: {:.2} ms",
+                    prediction,
+                    err * 1000.0
+                );
+                // send the beat if the network output is above threshold
+                if threshold_nw(prediction, args.threshold) {
+                    beat_send.store(true, Ordering::Relaxed);
+                    gui.update_row("Sent Beat For Time", &show_time(start, now + delay));
+                }
+
+                // update the next metronome instant
+                next_metro += quantization_interval;
             }
-
-            // update the next metronome instant
-            next_metro += quantization_interval;
         }
 
         // update the metronome value if needed
@@ -459,7 +478,10 @@ fn arpeggio_loop(
 
     // set up midi chord listener
     let midi_sub = context.socket(zmq::SUB).unwrap();
-    midi_sub.connect(&format!("tcp://localhost:{}", arp_args.midi_port))?;
+    midi_sub.connect(&format!(
+        "ipc:///tmp/zmq_robodrummer_{}",
+        arp_args.midi_port
+    ))?;
     midi_sub.set_subscribe(b"")?;
 
     let (chord_tx, chord_rx) = mpsc::channel();
@@ -564,13 +586,13 @@ pub fn combine(
     // connect to the metronome publisher
     let context = zmq::Context::new();
     let metronome = context.socket(zmq::SUB).unwrap();
-    metronome.connect(&format!("tcp://localhost:{}", args.metro_port))?;
+    metronome.connect(&format!("ipc:///tmp/zmq_robodrummer_{}", args.metro_port))?;
     // listen to all messages from the metronome publisher
     metronome.set_subscribe(b"")?;
 
     // connect to the rhythmic feel publisher
     let feel = context.socket(zmq::SUB).unwrap();
-    feel.connect(&format!("tcp://localhost:{}", args.feel_port))?;
+    feel.connect(&format!("ipc:///tmp/zmq_robodrummer_{}", args.feel_port))?;
     // listen to all messages from the rhythmic feel publisher
     feel.set_subscribe(b"")?;
 
@@ -601,7 +623,9 @@ pub fn combine(
         gui.disable();
     }
 
-    match args.output {
+    let output = args.output.clone();
+
+    match output {
         super::OutputMode::Drum(d) => drum_loop(args, d, gui, wait_rx, nw_rx, tui_sender),
         super::OutputMode::Arpeggio(arp_args) => {
             arpeggio_loop(args, arp_args, gui, nw_rx, wait_rx, context, tui_sender)

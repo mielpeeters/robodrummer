@@ -8,7 +8,7 @@ use crate::metronomer::{frequency::FrequencyComponent, spectrum::Spectrum};
 const MINIMUM_HITS_FOR_FOURIER: u32 = 5;
 const MINIMUM_FREQUENCY: f64 = 40.0 / 60.0;
 const MAXIMUM_FREQUENCY: f64 = 210.0 / 60.0;
-const WINDOW_LENGTH: f64 = 5.0;
+const WINDOW_LENGTH: f64 = 10.0;
 
 const BAND_WIDTH: f64 = 0.3;
 

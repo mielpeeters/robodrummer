@@ -223,10 +223,6 @@ nest! {
         #[arg(short, long)]
         pub density: Option<u8>,
 
-        /// Offset for chebyshev point generation
-        #[arg(long, default_value_t = 0.0)]
-        pub offset: f64,
-
         /// The output name to write the data to (saved at $XDG_DATA_HOME/robodrummer/traindata/{name}/)
         #[arg(short, long, default_value = "default")]
         pub output: String,
@@ -347,6 +343,10 @@ nest! {
         #[arg(long = "ch")]
         pub channel: Option<u8>,
 
+        /// The note value to filter input on
+        #[arg(long)]
+        pub key_in: Option<u8>,
+
         /// The device to listen on
         #[arg(long)]
         pub device: Option<String>,
@@ -354,6 +354,10 @@ nest! {
         /// Whether or not to output the midi messages of some channel
         #[arg(long)]
         pub output_publish: Option<u8>,
+
+        /// The note value to filter output on
+        #[arg(long)]
+        pub key_out: Option<u8>,
     }
 }
 
@@ -366,6 +370,8 @@ impl Default for MidiBrokerArgs {
             channel: None,
             device: None,
             output_publish: None,
+            key_in: None,
+            key_out: None,
         }
     }
 }
@@ -493,7 +499,7 @@ impl Display for DrumOutput {
     }
 }
 
-#[derive(Args, Debug, Copy, Clone)]
+#[derive(Args, Debug, Clone)]
 pub struct CCArgs {
     /// The midi CC value to adjust
     #[arg(short, long, default_value_t = 3)]
@@ -516,19 +522,41 @@ pub struct CCArgs {
     pub non_negative: bool,
 }
 
-#[derive(Args, Debug, Copy, Clone)]
+impl Default for CCArgs {
+    fn default() -> Self {
+        Self {
+            cc: 3,
+            channel: 8,
+            width: NonZeroU8::new(127).unwrap(),
+            offset: 0,
+            non_negative: false,
+        }
+    }
+}
+
+#[derive(Args, Debug, Clone)]
 pub struct ArpeggioArgs {
     /// The port on which to listen for midi chords
     #[arg(short, long, default_value_t = MIDI_PORT)]
     pub midi_port: u16,
 
     /// The midi channel to output on
-    #[arg(long = "ch", default_value = "1")]
+    #[arg(long = "ch", default_value = "8")]
     pub channel: u8,
 
     /// Duration of arpeggio notes
     #[arg(short, long, default_value_t = 0.5)]
     pub duration: f32,
+}
+
+impl Default for ArpeggioArgs {
+    fn default() -> Self {
+        Self {
+            midi_port: MIDI_PORT,
+            channel: 8,
+            duration: 0.5,
+        }
+    }
 }
 
 #[derive(Args, Debug)]

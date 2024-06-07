@@ -15,8 +15,8 @@ use tui_input::{backend::crossterm::EventHandler, Input};
 
 use crate::{
     commands::{
-        self, BrokerMode, CombinerArgs, DrumArgs, MetronomeArgs, MidiBrokerArgs, OutputMode,
-        RunArgs,
+        self, ArpeggioArgs, BrokerMode, CCArgs, CombinerArgs, DrumArgs, MetronomeArgs,
+        MidiBrokerArgs, OutputMode, RunArgs,
     },
     messages::{CombinerMessage, MetronomeMessage, MidiTuiMessage, NetworkMessage},
     utils::get_last_sent,
@@ -50,6 +50,7 @@ pub enum AppMode {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] // the fields whose functionalities are not implemented yet
 pub struct App {
     mode: AppMode,
     network: Vec<(f64, f64)>,
@@ -60,6 +61,8 @@ pub struct App {
     midi_args: MidiBrokerArgs,
     network_args: RunArgs,
     combiner_args: CombinerArgs,
+    arpeggio_args: ArpeggioArgs,
+    cc_args: CCArgs,
     /// The index of the pane with which the user is currently interacting
     active_pane: u8,
     exit: bool,
@@ -90,6 +93,8 @@ impl Default for App {
             midi_args: Default::default(),
             network_args: Default::default(),
             combiner_args: Default::default(),
+            arpeggio_args: Default::default(),
+            cc_args: Default::default(),
             active_pane: Default::default(),
             exit: Default::default(),
             input: Default::default(),
@@ -237,10 +242,11 @@ impl App {
                 self.mode = AppMode::Setup(0, false);
             }
             3 => {
-                self.question = "Enter the MIDI device to output to".into();
+                self.question = "Select an output mode".into();
+                self.options = vec!["Drum".into(), "Arpeggio".into(), "CC".into()];
                 self.input.reset();
                 // start at first question
-                self.mode = AppMode::Setup(0, false);
+                self.mode = AppMode::Setup(0, true);
             }
             _ => {
                 todo!()
@@ -291,6 +297,7 @@ impl App {
                         self.midi_args.device = Some(self.input.value().to_string());
                         self.question = "".into();
                         self.input.reset();
+                        self.midi_args.output_publish = None;
                         self.start_midi();
                         self.mode = AppMode::Normal;
                     }
@@ -329,23 +336,31 @@ impl App {
             // COMBINER
             3 => match self.mode {
                 AppMode::Setup(0, _) => {
-                    self.combiner_args.device = Some(self.input.value().to_string());
-                    self.question = "Select an output mode".into();
-                    self.options = vec!["Drum".into(), "Arpeggio".into(), "CC".into()];
-                    self.input.reset();
-                    self.mode = AppMode::Setup(1, true);
-                }
-                AppMode::Setup(1, _) => {
                     let mode: Result<usize, _> = self.input.value().parse();
                     check_parse!(self, mode);
+                    self.input.reset();
                     self.combiner_args.output = match mode.unwrap() {
-                        0 => OutputMode::Drum(DrumArgs::default()),
+                        0 => {
+                            // DRUM
+                            self.question = "Select an output note".into();
+                            self.mode = AppMode::Setup(2, false);
+                            OutputMode::Drum(DrumArgs::default())
+                        }
+                        1 => {
+                            // ARPEGGIO
+                            self.question = "Device name to connect to".into();
+                            self.mode = AppMode::Setup(5, false);
+                            OutputMode::Arpeggio(ArpeggioArgs::default())
+                        }
+                        2 => {
+                            // CC
+                            self.question = "Device name to connect to".into();
+                            self.mode = AppMode::Setup(16, false);
+                            OutputMode::CC(CCArgs::default())
+                        }
                         _ => todo!(),
                         // TODO: implement the others
                     };
-                    self.question = "Select an output note".into();
-                    self.input.reset();
-                    self.mode = AppMode::Setup(2, false);
                 }
                 AppMode::Setup(2, _) => {
                     let note: Result<u8, _> = self.input.value().parse();
@@ -369,6 +384,67 @@ impl App {
                     self.combiner_args.subdivision = subdivision.unwrap();
                     self.question = "".into();
                     self.input.reset();
+                    self.start_combiner();
+                    self.mode = AppMode::Normal;
+                }
+                AppMode::Setup(5, _) => {
+                    // ARPEGGIO, channel question
+                    let device = self.input.value();
+                    self.combiner_args.device = Some(device.into());
+
+                    self.question = "".into();
+                    self.question = "What midi channel to output to?".into();
+                    self.input.reset();
+                    self.mode = AppMode::Setup(6, false);
+                }
+                AppMode::Setup(6, _) => {
+                    // ARPEGGIO, channel question
+                    let channel = self.input.value().parse();
+                    check_parse!(self, channel);
+                    self.arpeggio_args.channel = channel.unwrap();
+
+                    self.question = "Give a subdivision amount".into();
+                    self.input.reset();
+                    self.mode = AppMode::Setup(7, false);
+                }
+                AppMode::Setup(7, _) => {
+                    let subdivision = self.input.value().parse();
+                    check_parse!(self, subdivision);
+                    self.combiner_args.subdivision = subdivision.unwrap();
+
+                    self.combiner_args.output = OutputMode::Arpeggio(self.arpeggio_args.clone());
+                    self.question = "".into();
+                    self.input.reset();
+                    self.start_combiner();
+                    self.mode = AppMode::Normal;
+                }
+                AppMode::Setup(16, _) => {
+                    // ARPEGGIO, channel question
+                    let device = self.input.value();
+                    self.combiner_args.device = Some(device.into());
+
+                    self.question = "What midi channel to output to?".into();
+                    self.input.reset();
+                    self.mode = AppMode::Setup(17, false)
+                }
+                AppMode::Setup(17, _) => {
+                    // CC, channel question
+                    let channel = self.input.value().parse();
+                    check_parse!(self, channel);
+                    self.cc_args.channel = channel.unwrap();
+
+                    self.question = "Which CC value should be adjusted".into();
+                    self.input.reset();
+                    self.mode = AppMode::Setup(18, false)
+                }
+                AppMode::Setup(18, _) => {
+                    let cc = self.input.value().parse();
+                    check_parse!(self, cc);
+                    self.cc_args.cc = cc.unwrap();
+
+                    self.question = "".into();
+                    self.input.reset();
+                    self.combiner_args.output = OutputMode::CC(self.cc_args.clone());
                     self.start_combiner();
                     self.mode = AppMode::Normal;
                 }
@@ -483,13 +559,36 @@ impl App {
     fn get_network_text(&self) -> Text {
         Text::from(Line::from(vec![
             "last output: ".into(),
-            self.network
-                .last()
-                .map(|(_, value)| *value)
-                .unwrap_or(0.0)
-                .to_string()
-                .yellow(),
+            format!(
+                "{:.3}",
+                self.network.last().map(|(_, value)| *value).unwrap_or(0.0)
+            )
+            .yellow(),
         ]))
+    }
+
+    fn get_combine_text(&self) -> Text {
+        let mut lines = vec![];
+        lines.push(Line::from(vec![
+            "output mode: ".into(),
+            self.combiner_args.output.to_string().yellow(),
+        ]));
+
+        if matches!(
+            self.combiner_args.output,
+            OutputMode::Drum(_) | OutputMode::Arpeggio(_)
+        ) {
+            lines.push(Line::from(vec![
+                "subdivision: ".into(),
+                self.combiner_args.subdivision.to_string().yellow(),
+            ]));
+            lines.push(Line::from(vec![
+                "threshold: ".into(),
+                self.combiner_args.threshold.to_string().yellow(),
+            ]));
+        }
+
+        Text::from(lines)
     }
 
     fn get_network_dataset(&self) -> Dataset {
@@ -513,10 +612,6 @@ impl App {
         Chart::new(vec![self.get_network_dataset()])
             .x_axis(x_axis)
             .y_axis(y_axis)
-    }
-
-    fn get_combine_text(&self) -> Text {
-        Text::from("TODO")
     }
 
     fn exit(&mut self) {
@@ -560,7 +655,7 @@ impl Widget for &App {
 
         let bottom = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints(vec![Constraint::Percentage(40), Constraint::Fill(1)])
+            .constraints(vec![Constraint::Percentage(70), Constraint::Fill(1)])
             .split(outer_layout[1]);
 
         let instructions = Title::from(Line::from(vec![
@@ -592,7 +687,7 @@ impl Widget for &App {
             .margin(1)
             .split(top[1]);
 
-        let nw_block = create_block(" network (3) ", self.active_pane == 2);
+        let nw_block = create_block(" reservoir (3) ", self.active_pane == 2);
         nw_block.render(bottom[0], buf);
         let nw_content = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)])
             .margin(1)

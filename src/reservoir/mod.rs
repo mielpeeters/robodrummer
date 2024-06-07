@@ -96,6 +96,7 @@ where
     });
 }
 
+#[allow(unused)]
 fn scale<D>(arr: &mut Array<f64, D>, factor: f64)
 where
     D: Dimension,
@@ -626,10 +627,9 @@ impl Reservoir {
 
     /// Fully train the network
     pub fn train(&mut self, args: &TrainArgs) -> Result<f64, Box<dyn std::error::Error>> {
-        let shift = match args.shift {
-            Some(shift) => Some((shift as f64 / args.timestep).round() as usize),
-            None => None,
-        };
+        let shift = args
+            .shift
+            .map(|shift| (shift as f64 / args.timestep).round() as usize);
 
         let (inputs, targets) = load_train_data(
             &args.data,

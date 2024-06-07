@@ -14,7 +14,7 @@ use std::{
 };
 
 use cpal::{
-    traits::{DeviceTrait, HostTrait, StreamTrait},
+    traits::{DeviceTrait, HostTrait},
     Stream, SupportedStreamConfig,
 };
 
@@ -87,27 +87,17 @@ pub fn start(
     send_beat: Arc<AtomicBool>,
     wave: WaveType,
 ) -> (Stream, SupportedStreamConfig, JoinHandle<()>) {
-    // let host = cpal::host_from_id(
-    //     cpal::available_hosts()
-    //         .into_iter()
-    //         .find(|id| *id == cpal::HostId::Jack)
-    //         .expect("features = ['jack'] should be added to the Cargo.toml file"),
-    // )
-    // .expect("jack host should be available");
-    let host = cpal::default_host();
+    let host = cpal::host_from_id(
+        cpal::available_hosts()
+            .into_iter()
+            .find(|id| *id == cpal::HostId::Jack)
+            .expect("features = ['jack'] should be added to the Cargo.toml file"),
+    )
+    .expect("jack host should be available");
 
     let device = host.default_output_device().unwrap();
 
     let config = device.default_output_config().unwrap();
-
-    let configs = device.supported_output_configs().unwrap();
-
-    configs.for_each(|c| {
-        log::info!("Supported config: {:#?}", c);
-    });
-
-    // TODO: fix the output buffer size and sample rate to get rid of output
-    // jitter of 22ms..
 
     let sample_rate = config.sample_rate().0 as f32;
     let channels = config.channels() as usize;
@@ -121,24 +111,20 @@ pub fn start(
 
     let output_queue = Arc::clone(&queue);
 
-    let out_stream = device
-        .build_output_stream(
-            &config.config(),
-            move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                for frame in data.chunks_mut(channels) {
-                    let mut sample = output_queue.lock().unwrap();
-                    let sample = sample.pop_front().unwrap_or(0.0);
-                    for ch in frame {
-                        *ch = sample;
-                    }
+    let out_stream = device.build_output_stream(
+        &config.config(),
+        move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+            for frame in data.chunks_mut(channels) {
+                let mut sample = output_queue.lock().unwrap();
+                let sample = sample.pop_front().unwrap_or(0.0);
+                for ch in frame {
+                    *ch = sample;
                 }
-            },
-            err_fn,
-            None,
-        )
-        .unwrap();
-
-    out_stream.play().unwrap();
+            }
+        },
+        err_fn,
+        None,
+    );
 
     // start the thread that receives the beat signal
     let handle = std::thread::spawn(move || loop {
@@ -154,5 +140,5 @@ pub fn start(
         sleep(Duration::from_millis(1));
     });
 
-    (out_stream, config, handle)
+    (out_stream.unwrap(), config, handle)
 }

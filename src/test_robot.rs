@@ -24,7 +24,7 @@ const WAVE_TEST_COUNT: u32 = 20;
 
 pub fn sweep() -> Result<(), Box<dyn Error>> {
     // set up incoming MIDI connection (robot's output) (listen for any channel)
-    let rx = midier::setup_midi_receiver(None, None)?;
+    let rx = midier::setup_midi_receiver(None, None, None)?;
 
     // set up outgoing audio connection
     let beat = Arc::new(AtomicBool::new(false));
@@ -88,7 +88,7 @@ pub fn sweep() -> Result<(), Box<dyn Error>> {
 
 pub fn meas_delay() -> Result<(), Box<dyn Error>> {
     // set up incoming MIDI connection (robot's output) (listen for any channel)
-    let rx = midier::setup_midi_receiver(None, None)?;
+    let rx = midier::setup_midi_receiver(None, None, None)?;
 
     let wave = WaveType::Saw(0.15);
 
@@ -151,7 +151,7 @@ pub fn meas_delay() -> Result<(), Box<dyn Error>> {
 
 pub fn test_waves() -> Result<(), Box<dyn Error>> {
     // set up incoming MIDI connection (robot's output) (listen for any channel)
-    let rx = midier::setup_midi_receiver(None, None)?;
+    let rx = midier::setup_midi_receiver(None, None, None)?;
 
     let waves = vec![
         WaveType::Saw(0.15),

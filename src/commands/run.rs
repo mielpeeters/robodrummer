@@ -37,11 +37,11 @@ pub fn run(
     // set up network output connection
     let context = zmq::Context::new();
     let publisher = context.socket(zmq::PUB)?;
-    publisher.bind(&format!("tcp://*:{}", zmq_port_pub))?;
+    publisher.bind(&format!("ipc:///tmp/zmq_robodrummer_{}", zmq_port_pub))?;
 
     // listen for metronome value
     let subscriber = context.socket(zmq::SUB)?;
-    subscriber.connect(&format!("tcp://localhost:{}", zmq_port_sub))?;
+    subscriber.connect(&format!("ipc:///tmp/zmq_robodrummer_{}", zmq_port_sub))?;
     subscriber.set_subscribe(b"")?;
 
     let metronome: Arc<Mutex<f64>> = Arc::new(Mutex::new(2.0));
@@ -54,7 +54,7 @@ pub fn run(
 
     // listen for midi inputs
     let midi_in = context.socket(zmq::SUB)?;
-    midi_in.connect(&format!("tcp://localhost:{}", args.midi_port))?;
+    midi_in.connect(&format!("ipc:///tmp/zmq_robodrummer_{}", args.midi_port))?;
     midi_in.set_subscribe(b"")?;
 
     // set up osc output Socket
