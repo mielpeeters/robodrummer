@@ -1,3 +1,0 @@
-(function() {var implementors = {
-"robodrummer":[["impl ValueEnum for <a class=\"enum\" href=\"robodrummer/commands/enum.DrumOutput.html\" title=\"enum robodrummer::commands::DrumOutput\">DrumOutput</a>"],["impl ValueEnum for <a class=\"enum\" href=\"robodrummer/commands/enum.BrokerMode.html\" title=\"enum robodrummer::commands::BrokerMode\">BrokerMode</a>"],["impl ValueEnum for <a class=\"enum\" href=\"robodrummer/commands/enum.TrainMode.html\" title=\"enum robodrummer::commands::TrainMode\">TrainMode</a>"]]
-};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

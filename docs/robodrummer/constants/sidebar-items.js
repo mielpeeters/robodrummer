@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["OUTPUT_NEURON_DIRECT_FEEDBACK"]};

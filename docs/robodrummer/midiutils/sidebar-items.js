@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["play_model","send_beat"]};

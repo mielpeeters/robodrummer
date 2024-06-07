@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["constant","impulse_pause","impulse_width_pause","linear","saw_with","sine_speed_up","sine_with","spike"]};
