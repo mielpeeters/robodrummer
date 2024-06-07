@@ -139,6 +139,9 @@
 <a href="#137" id="137">137</a>
 <a href="#138" id="138">138</a>
 <a href="#139" id="139">139</a>
+<a href="#140" id="140">140</a>
+<a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     error::Error,
     sync::{mpsc::Sender, Arc, Mutex},
@@ -148,9 +151,9 @@
 <span class="kw">use crate</span>::{
     data::{get_model_metadata, list_models},
     guier::Gui,
+    messages::{MidiNoteMessage, NetworkMessage},
     oscutil,
     reservoir::Reservoir,
-    tui::messages::NetworkMessage,
 };
 <span class="kw">use </span>ndarray::Array1;
 
@@ -178,11 +181,11 @@
     <span class="comment">// set up network output connection
     </span><span class="kw">let </span>context = zmq::Context::new();
     <span class="kw">let </span>publisher = context.socket(zmq::PUB)<span class="question-mark">?</span>;
-    publisher.bind(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"tcp://*:{}"</span>, zmq_port_pub))<span class="question-mark">?</span>;
+    publisher.bind(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"ipc:///tmp/zmq_robodrummer_{}"</span>, zmq_port_pub))<span class="question-mark">?</span>;
 
     <span class="comment">// listen for metronome value
     </span><span class="kw">let </span>subscriber = context.socket(zmq::SUB)<span class="question-mark">?</span>;
-    subscriber.connect(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"tcp://localhost:{}"</span>, zmq_port_sub))<span class="question-mark">?</span>;
+    subscriber.connect(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"ipc:///tmp/zmq_robodrummer_{}"</span>, zmq_port_sub))<span class="question-mark">?</span>;
     subscriber.set_subscribe(<span class="string">b""</span>)<span class="question-mark">?</span>;
 
     <span class="kw">let </span>metronome: Arc&lt;Mutex&lt;f64&gt;&gt; = Arc::new(Mutex::new(<span class="number">2.0</span>));
@@ -195,7 +198,7 @@
 
     <span class="comment">// listen for midi inputs
     </span><span class="kw">let </span>midi_in = context.socket(zmq::SUB)<span class="question-mark">?</span>;
-    midi_in.connect(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"tcp://localhost:{}"</span>, args.midi_port))<span class="question-mark">?</span>;
+    midi_in.connect(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"ipc:///tmp/zmq_robodrummer_{}"</span>, args.midi_port))<span class="question-mark">?</span>;
     midi_in.set_subscribe(<span class="string">b""</span>)<span class="question-mark">?</span>;
 
     <span class="comment">// set up osc output Socket
@@ -220,8 +223,11 @@
 
         <span class="comment">// input zero on non-inputs, 1 on inputs
         </span><span class="kw">let </span><span class="kw-2">mut </span>input = Array1::zeros(nw.inputs);
-        <span class="kw">if </span>midi_in.recv_bytes(zmq::DONTWAIT).is_ok() {
-            input_steps_remaining = input_width;
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>(midi_msg) = midi_in.recv_bytes(zmq::DONTWAIT) {
+            <span class="kw">let </span>msg: MidiNoteMessage = bincode::deserialize(<span class="kw-2">&amp;</span>midi_msg)<span class="question-mark">?</span>;
+            <span class="kw">if </span>msg.is_input() {
+                input_steps_remaining = input_width;
+            }
         }
 
         <span class="kw">if </span>input_steps_remaining &gt; <span class="number">0 </span>{
@@ -244,7 +250,7 @@
         publisher.send((new_output <span class="kw">as </span>f32).to_be_bytes().as_slice(), <span class="number">0</span>)<span class="question-mark">?</span>;
         oscutil::send_osc_msg(
             <span class="string">"/robodrummer"</span>,
-            <span class="macro">vec!</span>[osc::OscType::Float(new_output <span class="kw">as </span>f32)],
+            <span class="macro">vec!</span>[rosc::OscType::Float(new_output <span class="kw">as </span>f32)],
             <span class="kw-2">&amp;</span>osc_sock,
         );
 

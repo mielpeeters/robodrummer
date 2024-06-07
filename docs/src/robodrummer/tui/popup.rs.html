@@ -78,6 +78,34 @@
 <a href="#76" id="76">76</a>
 <a href="#77" id="77">77</a>
 <a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
+<a href="#81" id="81">81</a>
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+<a href="#90" id="90">90</a>
+<a href="#91" id="91">91</a>
+<a href="#92" id="92">92</a>
+<a href="#93" id="93">93</a>
+<a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
+<a href="#106" id="106">106</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>derive_setters::Setters;
 <span class="kw">use </span>ratatui::{
     prelude::<span class="kw-2">*</span>,
@@ -91,6 +119,8 @@
     </span><span class="kw">pub </span>title: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str,
     <span class="attr">#[setters(into)]
     </span><span class="kw">pub </span>question: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str,
+    <span class="attr">#[setters(into)]
+    </span><span class="kw">pub </span>options: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">'a </span>[String]&gt;,
     <span class="kw">pub </span>input: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str,
 }
 
@@ -117,16 +147,42 @@
             .border_set(border::ROUNDED);
 
         block.render(area, buf);
-
-        <span class="kw">let </span>popup_chunks = Layout::vertical([Constraint::Length(<span class="number">1</span>), Constraint::Min(<span class="number">1</span>)])
-            .margin(<span class="number">1</span>)
-            .split(area);
-
         <span class="kw">let </span>question = Text::styled(<span class="self">self</span>.question, Style::default().fg(Color::LightGreen).bold());
         <span class="kw">let </span>input = Text::from(<span class="macro">format!</span>(<span class="string">"&gt; {}"</span>, <span class="self">self</span>.input));
 
-        Paragraph::new(question).render(popup_chunks[<span class="number">0</span>], buf);
-        Paragraph::new(input).render(popup_chunks[<span class="number">1</span>], buf);
+        <span class="kw">match </span><span class="self">self</span>.options {
+            <span class="prelude-val">None </span>=&gt; {
+                <span class="kw">let </span>popup_chunks = Layout::vertical([Constraint::Length(<span class="number">1</span>), Constraint::Min(<span class="number">1</span>)])
+                    .margin(<span class="number">1</span>)
+                    .split(area);
+
+                Paragraph::new(question).render(popup_chunks[<span class="number">0</span>], buf);
+                Paragraph::new(input).render(popup_chunks[<span class="number">1</span>], buf);
+            }
+            <span class="prelude-val">Some</span>(o) =&gt; {
+                <span class="kw">let </span>popup_chunks = Layout::vertical([
+                    Constraint::Length(<span class="number">1</span>),
+                    Constraint::Fill(<span class="number">1</span>),
+                    Constraint::Length(<span class="number">1</span>),
+                ])
+                .margin(<span class="number">1</span>)
+                .split(area);
+
+                <span class="kw">let </span>options_string = o
+                    .iter()
+                    .enumerate()
+                    .map(|(i, o)| <span class="macro">format!</span>(<span class="string">"{}: {}"</span>, i, o))
+                    .collect::&lt;Vec&lt;String&gt;&gt;()
+                    .join(<span class="string">"\n"</span>);
+
+                <span class="kw">let </span>options =
+                    Text::styled(options_string, Style::default().fg(Color::LightBlue).bold());
+
+                Paragraph::new(question).render(popup_chunks[<span class="number">0</span>], buf);
+                Paragraph::new(options).render(popup_chunks[<span class="number">1</span>], buf);
+                Paragraph::new(input).render(popup_chunks[<span class="number">2</span>], buf);
+            }
+        }
     }
 }
 

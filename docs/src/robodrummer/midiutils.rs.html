@@ -80,8 +80,8 @@
 
 <span class="kw">use </span><span class="kw">crate</span>::midier::create_midi_output_and_connect;
 <span class="kw">use </span>make_csv::{csv_entry, csv_start, csv_stop, python};
-<span class="kw">use </span>midi_control::MidiMessageSend;
-<span class="kw">use </span>ndarray::Array1;
+<span class="comment">// use midi_control::MidiMessageSend;
+</span><span class="kw">use </span>ndarray::Array1;
 
 <span class="kw">use crate</span>::{add_data, reservoir::Reservoir, series::<span class="kw-2">*</span>, trainutil::add_series_data};
 
@@ -92,14 +92,14 @@
         <span class="kw">_ </span>=&gt; midi_control::Channel::Ch1,
     };
 
-    conn.send_message(midi_control::note_on(ch, <span class="number">60</span>, <span class="number">100</span>))
-        .unwrap();
+    <span class="kw">let </span>msg: Vec&lt;u8&gt; = midi_control::note_on(ch, <span class="number">60</span>, <span class="number">100</span>).into();
+    conn.send(msg.as_slice()).unwrap();
 }
 
 <span class="kw">pub fn </span>play_model(<span class="kw-2">mut </span>model: Box&lt;Reservoir&gt;) {
     model.reset_state();
 
-    <span class="kw">let </span><span class="kw-2">mut </span>midi_out = create_midi_output_and_connect().unwrap();
+    <span class="kw">let </span><span class="kw-2">mut </span>midi_out = create_midi_output_and_connect(<span class="prelude-val">None</span>).unwrap();
 
     <span class="kw">let </span><span class="kw-2">mut </span>curr = [model.get_output(<span class="number">0</span>), model.get_output(<span class="number">1</span>)];
     <span class="comment">// let mut speed = [0.0; 2];

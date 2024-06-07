@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"macro":["add_data"],"mod":["commands","constants","data","midier","midiutils","oscutil","reservoir","robot","series","trainutil"]};
+window.SIDEBAR_ITEMS = {"macro":["add_data"],"mod":["activation","arpeggio","commands","constants","data","errors","guier","hyper","messages","metronomer","midier","midiutils","oscutil","reservoir","robot","series","test_robot","trainutil","tui","utils"]};

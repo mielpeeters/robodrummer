@@ -199,6 +199,69 @@
 <a href="#197" id="197">197</a>
 <a href="#198" id="198">198</a>
 <a href="#199" id="199">199</a>
+<a href="#200" id="200">200</a>
+<a href="#201" id="201">201</a>
+<a href="#202" id="202">202</a>
+<a href="#203" id="203">203</a>
+<a href="#204" id="204">204</a>
+<a href="#205" id="205">205</a>
+<a href="#206" id="206">206</a>
+<a href="#207" id="207">207</a>
+<a href="#208" id="208">208</a>
+<a href="#209" id="209">209</a>
+<a href="#210" id="210">210</a>
+<a href="#211" id="211">211</a>
+<a href="#212" id="212">212</a>
+<a href="#213" id="213">213</a>
+<a href="#214" id="214">214</a>
+<a href="#215" id="215">215</a>
+<a href="#216" id="216">216</a>
+<a href="#217" id="217">217</a>
+<a href="#218" id="218">218</a>
+<a href="#219" id="219">219</a>
+<a href="#220" id="220">220</a>
+<a href="#221" id="221">221</a>
+<a href="#222" id="222">222</a>
+<a href="#223" id="223">223</a>
+<a href="#224" id="224">224</a>
+<a href="#225" id="225">225</a>
+<a href="#226" id="226">226</a>
+<a href="#227" id="227">227</a>
+<a href="#228" id="228">228</a>
+<a href="#229" id="229">229</a>
+<a href="#230" id="230">230</a>
+<a href="#231" id="231">231</a>
+<a href="#232" id="232">232</a>
+<a href="#233" id="233">233</a>
+<a href="#234" id="234">234</a>
+<a href="#235" id="235">235</a>
+<a href="#236" id="236">236</a>
+<a href="#237" id="237">237</a>
+<a href="#238" id="238">238</a>
+<a href="#239" id="239">239</a>
+<a href="#240" id="240">240</a>
+<a href="#241" id="241">241</a>
+<a href="#242" id="242">242</a>
+<a href="#243" id="243">243</a>
+<a href="#244" id="244">244</a>
+<a href="#245" id="245">245</a>
+<a href="#246" id="246">246</a>
+<a href="#247" id="247">247</a>
+<a href="#248" id="248">248</a>
+<a href="#249" id="249">249</a>
+<a href="#250" id="250">250</a>
+<a href="#251" id="251">251</a>
+<a href="#252" id="252">252</a>
+<a href="#253" id="253">253</a>
+<a href="#254" id="254">254</a>
+<a href="#255" id="255">255</a>
+<a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>errors;
 
 <span class="kw">use </span>std::{
@@ -207,12 +270,12 @@
     sync::{
         atomic::{AtomicBool, Ordering},
         mpsc::{<span class="self">self</span>, Receiver},
-        Arc,
+        Arc, Condvar, Mutex,
     },
     thread,
 };
 
-<span class="kw">use </span>midi_control::{KeyEvent, MidiMessage, MidiMessageSend};
+<span class="kw">use </span>midi_control::{KeyEvent, MidiMessage};
 
 <span class="kw">fn </span>ask(question: <span class="kw-2">&amp;</span>str) -&gt; usize {
     <span class="macro">print!</span>(<span class="string">"\n{question}"</span>);
@@ -225,18 +288,30 @@
     answer.trim().parse::&lt;usize&gt;().unwrap()
 }
 
-<span class="kw">pub fn </span>create_midi_output_and_connect() -&gt; <span class="prelude-ty">Result</span>&lt;midir::MidiOutputConnection, errors::MidiError&gt; {
-    <span class="kw">let </span><span class="prelude-val">Ok</span>(output) = midir::MidiOutput::new(<span class="string">"midier output"</span>) <span class="kw">else </span>{
+<span class="kw">pub fn </span>create_midi_output(name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;midir::MidiOutput, errors::MidiError&gt; {
+    <span class="kw">let </span><span class="prelude-val">Ok</span>(output) = midir::MidiOutput::new(name) <span class="kw">else </span>{
         <span class="kw">return </span><span class="prelude-val">Err</span>(errors::MidiError::CantCreateMidiOut);
     };
 
-    <span class="macro">println!</span>(<span class="string">"Available Midi ports to connect to:"</span>);
-    <span class="kw">let </span>ports = output.ports();
-    <span class="kw">for </span>(i, port) <span class="kw">in </span>ports.iter().enumerate() {
-        <span class="macro">println!</span>(<span class="string">"{i}:   {}"</span>, output.port_name(port).unwrap());
-    }
+    <span class="prelude-val">Ok</span>(output)
+}
 
-    <span class="kw">let </span>num = ask(<span class="string">"Select one: "</span>);
+<span class="kw">pub fn </span>connect_output(
+    output: midir::MidiOutput,
+) -&gt; <span class="prelude-ty">Result</span>&lt;midir::MidiOutputConnection, errors::MidiError&gt; {
+    <span class="kw">let </span>ports = output.ports();
+
+    <span class="kw">let </span>num = {
+        <span class="macro">println!</span>(<span class="string">"Available Midi ports to connect to:"</span>);
+        <span class="kw">for </span>(i, port) <span class="kw">in </span>ports.iter().enumerate() {
+            <span class="macro">println!</span>(<span class="string">"\t{i}: {}"</span>, output.port_name(port).unwrap());
+        }
+        <span class="kw">let </span>res = ask(<span class="string">"Select one: "</span>);
+        <span class="kw">if </span>res &gt;= ports.len() {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(errors::MidiError::PortNotOpen);
+        }
+        res
+    };
 
     <span class="kw">let </span>name = output.port_name(ports.get(num).unwrap()).unwrap();
 
@@ -245,6 +320,45 @@
     };
 
     <span class="macro">println!</span>(<span class="string">"Connected to Midi device \x1b[1m{}\x1b[0m!"</span>, name);
+
+    <span class="prelude-val">Ok</span>(conn)
+}
+
+<span class="kw">pub fn </span>create_midi_output_and_connect(
+    device: <span class="prelude-ty">Option</span>&lt;String&gt;,
+) -&gt; <span class="prelude-ty">Result</span>&lt;midir::MidiOutputConnection, errors::MidiError&gt; {
+    <span class="kw">let </span><span class="prelude-val">Ok</span>(output) = midir::MidiOutput::new(<span class="string">"midier output"</span>) <span class="kw">else </span>{
+        <span class="kw">return </span><span class="prelude-val">Err</span>(errors::MidiError::CantCreateMidiOut);
+    };
+
+    <span class="kw">let </span>ports = output.ports();
+
+    <span class="kw">let </span>num = <span class="kw">if let </span><span class="prelude-val">Some</span>(device) = <span class="kw-2">&amp;</span>device {
+        ports
+            .iter()
+            .position(|port| check_midi_device(<span class="kw-2">&amp;</span>output.port_name(port).unwrap(), device))
+            .ok_or(errors::MidiError::DeviceNotFound(device.to_string()))<span class="question-mark">?
+    </span>} <span class="kw">else </span>{
+        <span class="macro">println!</span>(<span class="string">"Available Midi ports to connect to:"</span>);
+        <span class="kw">for </span>(i, port) <span class="kw">in </span>ports.iter().enumerate() {
+            <span class="macro">println!</span>(<span class="string">"\t{i}: {}"</span>, output.port_name(port).unwrap());
+        }
+        <span class="kw">let </span>res = ask(<span class="string">"Select one: "</span>);
+        <span class="kw">if </span>res &gt;= ports.len() {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(errors::MidiError::PortNotOpen);
+        }
+        res
+    };
+
+    <span class="kw">let </span>name = output.port_name(ports.get(num).unwrap()).unwrap();
+
+    <span class="kw">let </span><span class="prelude-val">Ok</span>(conn) = output.connect(ports.get(num).unwrap(), <span class="string">"midier output port"</span>) <span class="kw">else </span>{
+        <span class="kw">return </span><span class="prelude-val">Err</span>(errors::MidiError::CantConnectMidi);
+    };
+
+    <span class="kw">if </span>device.is_none() {
+        <span class="macro">println!</span>(<span class="string">"Connected to Midi device \x1b[1m{}\x1b[0m!"</span>, name);
+    }
 
     <span class="prelude-val">Ok</span>(conn)
 }
@@ -302,43 +416,58 @@
         <span class="kw">_ </span>=&gt; midi_control::Channel::Ch1,
     };
 
-    conn.send_message(midi_control::note_on(ch, <span class="number">60</span>, <span class="number">100</span>))
-        .unwrap();
+    <span class="kw">let </span>msg: Vec&lt;u8&gt; = midi_control::note_on(ch, <span class="number">60</span>, <span class="number">100</span>).into();
+    conn.send(msg.as_slice()).unwrap();
 }
 
 <span class="kw">pub fn </span>send_note(conn: <span class="kw-2">&amp;mut </span>midir::MidiOutputConnection, channel: u32, note: u8, velocity: u8) {
-    <span class="kw">let </span>ch = <span class="kw">match </span>channel {
-        <span class="number">1 </span>=&gt; midi_control::Channel::Ch1,
-        <span class="number">2 </span>=&gt; midi_control::Channel::Ch2,
-        <span class="kw">_ </span>=&gt; midi_control::Channel::Ch1,
-    };
-
-    conn.send_message(midi_control::note_on(ch, note, velocity))
-        .unwrap();
+    <span class="kw">let </span>ch = midi_control::Channel::from(channel <span class="kw">as </span>u8);
+    <span class="kw">let </span>msg: Vec&lt;u8&gt; = midi_control::note_on(ch, note, velocity).into();
+    conn.send(msg.as_slice()).unwrap();
 }
 
+<span class="kw">type </span>MidiNote = (u64, u8, KeyEvent);
 <span class="kw">pub fn </span>setup_midi_receiver(
     channel: <span class="prelude-ty">Option</span>&lt;u8&gt;,
+    key: <span class="prelude-ty">Option</span>&lt;u8&gt;,
     device: <span class="prelude-ty">Option</span>&lt;String&gt;,
-) -&gt; <span class="prelude-ty">Result</span>&lt;Receiver&lt;(u64, KeyEvent)&gt;, Box&lt;<span class="kw">dyn </span>Error&gt;&gt; {
+) -&gt; <span class="prelude-ty">Result</span>&lt;Receiver&lt;MidiNote&gt;, Box&lt;<span class="kw">dyn </span>Error&gt;&gt; {
     <span class="kw">let </span>done = Arc::new(AtomicBool::new(<span class="bool-val">false</span>));
     <span class="kw">let </span>done_clone = done.clone();
     <span class="kw">let </span>(error_tx, error_rx) = mpsc::channel();
     <span class="kw">let </span>(tx, rx) = mpsc::channel();
     thread::spawn(<span class="kw">move </span>|| {
-        <span class="kw">let </span>no_connection_left = Arc::new(AtomicBool::new(<span class="bool-val">false</span>));
+        <span class="kw">let </span>no_connection_left = Arc::new((Mutex::new(<span class="bool-val">false</span>), Condvar::new()));
         <span class="kw">let </span>no_connection_left_clone = no_connection_left.clone();
         <span class="kw">let </span>midi_in = create_midi_input_and_connect(
             <span class="kw">move </span>|stamp, msg, tx_local| {
                 <span class="kw">let </span>midimsg = MidiMessage::from(msg);
                 <span class="kw">if let </span>MidiMessage::NoteOn(c, k) = midimsg {
-                    <span class="kw">if let </span><span class="prelude-val">Some</span>(channel) = channel {
+                    <span class="comment">// filter on midi channel if needed
+                    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(channel) = channel {
                         <span class="kw">if </span>c != (channel - <span class="number">1</span>).into() {
                             <span class="kw">return</span>;
                         }
                     }
-                    <span class="kw">if </span>tx_local.send((stamp, k)).is_err() {
-                        no_connection_left_clone.store(<span class="bool-val">true</span>, Ordering::Relaxed)
+
+                    <span class="kw">let </span>c = c <span class="kw">as </span>u8;
+
+                    <span class="comment">// check if the key matches
+                    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(desired_key) = key {
+                        <span class="kw">if </span>k.key != desired_key {
+                            <span class="kw">return</span>;
+                        }
+                    }
+
+                    <span class="comment">// check if velocity &gt; 0
+                    </span><span class="kw">if </span>k.value == <span class="number">0 </span>{
+                        <span class="kw">return</span>;
+                    }
+
+                    <span class="comment">// send the midi keyevent to the main thread
+                    </span><span class="kw">if </span>tx_local.send((stamp, c, k)).is_err() {
+                        <span class="kw-2">*</span>no_connection_left_clone.<span class="number">0</span>.lock().unwrap() = <span class="bool-val">true</span>;
+                        no_connection_left_clone.<span class="number">1</span>.notify_all()
                     };
                 };
             },
@@ -353,15 +482,12 @@
 
         done_clone.store(<span class="bool-val">true</span>, Ordering::Relaxed);
 
-        <span class="kw">loop </span>{
-            <span class="kw">if </span>no_connection_left.load(Ordering::Relaxed) {
-                <span class="comment">// not needed but this shows the purpose
-                </span>drop(midi_in);
-                <span class="kw">break</span>;
-            }
-            <span class="comment">// keep the thread (thus the midi connection) alive
-            </span>thread::sleep(std::time::Duration::from_millis(<span class="number">100000</span>));
+        <span class="kw">let </span><span class="kw-2">mut </span>no_left = no_connection_left.<span class="number">0</span>.lock().unwrap();
+        <span class="kw">while </span>!<span class="kw-2">*</span>no_left {
+            no_left = no_connection_left.<span class="number">1</span>.wait(no_left).unwrap();
         }
+
+        drop(midi_in);
     });
 
     <span class="kw">while </span>!done.load(std::sync::atomic::Ordering::Relaxed) {
@@ -382,7 +508,7 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>test_output() {
-        <span class="kw">let </span>conn = create_midi_output_and_connect();
+        <span class="kw">let </span>conn = create_midi_output_and_connect(<span class="prelude-val">None</span>);
 
         <span class="macro">assert!</span>(conn.is_ok(), <span class="string">"Connection wasnt correctly created"</span>)
     }

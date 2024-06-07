@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"robodrummer":[["impl <a class=\"trait\" href=\"https://doc.rust-lang.org/1.77.2/core/cmp/trait.PartialOrd.html\" title=\"trait core::cmp::PartialOrd\">PartialOrd</a> for <a class=\"struct\" href=\"robodrummer/metronomer/frequency/struct.FrequencyComponent.html\" title=\"struct robodrummer::metronomer::frequency::FrequencyComponent\">FrequencyComponent</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

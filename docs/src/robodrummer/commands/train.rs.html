@@ -196,11 +196,6 @@
 <a href="#194" id="194">194</a>
 <a href="#195" id="195">195</a>
 <a href="#196" id="196">196</a>
-<a href="#197" id="197">197</a>
-<a href="#198" id="198">198</a>
-<a href="#199" id="199">199</a>
-<a href="#200" id="200">200</a>
-<a href="#201" id="201">201</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::error::Error;
 
 <span class="kw">use crate</span>::{
@@ -238,7 +233,7 @@
 ) {
     {
         <span class="comment">// plot target and network output graph
-        </span><span class="kw">let </span><span class="kw-2">mut </span>wtr = <span class="macro">csv_start!</span>(<span class="string">"out.csv"</span>);
+        </span><span class="kw">let </span><span class="kw-2">mut </span>wtr = <span class="macro">csv_start!</span>(<span class="string">"data/network_trained.csv"</span>);
         <span class="macro">csv_entry!</span>(wtr &lt;- <span class="string">"t"</span>, <span class="string">"nw_0"</span>, <span class="string">"target_0"</span>, <span class="string">"input_0"</span>);
 
         (<span class="number">0</span>..train_inputs.len()).for_each(|i| {
@@ -253,28 +248,26 @@
             }
         });
     }
-    <span class="macro">python!</span>(<span class="string">"plot.py"</span>);
+    <span class="macro">python!</span>(<span class="string">"plot.py"</span>, <span class="string">"data/network_trained.csv"</span>);
 
     {
         <span class="comment">// plot error graph
-        </span><span class="kw">let </span><span class="kw-2">mut </span>wtr = <span class="macro">csv_start!</span>(<span class="string">"out.csv"</span>);
+        </span><span class="kw">let </span><span class="kw-2">mut </span>wtr = <span class="macro">csv_start!</span>(<span class="string">"data/error.csv"</span>);
         <span class="macro">csv_entry!</span>(wtr &lt;- <span class="string">"t"</span>, <span class="string">"error"</span>);
 
         <span class="kw">for </span>(i, error) <span class="kw">in </span>errors.iter().enumerate() {
             <span class="macro">csv_entry!</span>(wtr &lt;- i, error);
         }
     }
-    <span class="macro">python!</span>(<span class="string">"plot.py"</span>);
+    <span class="macro">python!</span>(<span class="string">"plot.py"</span>, <span class="string">"data/error.csv"</span>);
 
     {
         <span class="comment">// plot test graph
-        </span><span class="kw">let </span><span class="kw-2">mut </span>wtr = <span class="macro">csv_start!</span>(<span class="string">"out.csv"</span>);
-        <span class="kw">let </span><span class="kw-2">mut </span>int_wtr = <span class="macro">csv_start!</span>(<span class="string">"int_states.csv"</span>);
+        </span><span class="kw">let </span><span class="kw-2">mut </span>wtr = <span class="macro">csv_start!</span>(<span class="string">"data/network_test.csv"</span>);
+        <span class="kw">let </span><span class="kw-2">mut </span>int_wtr = <span class="macro">csv_start!</span>(<span class="string">"data/int_states.csv"</span>);
 
         <span class="macro">csv_entry!</span>(wtr &lt;- <span class="string">"t"</span>, <span class="string">"nw_0"</span>, <span class="string">"input_0"</span>);
-        <span class="kw">if </span>args.npy.is_some() {
-            <span class="macro">csv_entry!</span>(int_wtr &lt;- <span class="string">"t"</span>, <span class="string">"state_0"</span>, <span class="string">"state_1"</span>, <span class="string">"state_2"</span>, <span class="string">"state_3"</span>);
-        }
+        <span class="macro">csv_entry!</span>(int_wtr &lt;- <span class="string">"t"</span>, <span class="string">"state_0"</span>, <span class="string">"state_1"</span>, <span class="string">"state_2"</span>, <span class="string">"state_3"</span>);
 
         nw.reset_state();
 
@@ -283,9 +276,7 @@
 
             <span class="macro">csv_entry!</span>(wtr &lt;- i, nw.output[<span class="number">0</span>], input[<span class="number">0</span>]);
             <span class="kw">let </span>states = nw.get_visible_state();
-            <span class="kw">if </span>args.npy.is_some() {
-                <span class="macro">csv_entry!</span>(int_wtr &lt;- i, states[<span class="number">0</span>], states[<span class="number">10</span>], states[<span class="number">20</span>], states[<span class="number">35</span>]);
-            }
+            <span class="macro">csv_entry!</span>(int_wtr &lt;- i, states[<span class="number">0</span>], states[<span class="number">10</span>], states[<span class="number">20</span>], states[<span class="number">35</span>]);
         }
 
         <span class="comment">// also add some zeros to see the steady state behaviour
@@ -294,15 +285,11 @@
             nw.forward(<span class="kw-2">&amp;</span>input);
             <span class="macro">csv_entry!</span>(wtr &lt;- i + test_inputs.len(), nw.output[<span class="number">0</span>], input[<span class="number">0</span>]);
             <span class="kw">let </span>states = nw.get_visible_state();
-            <span class="kw">if </span>args.npy.is_some() {
-                <span class="macro">csv_entry!</span>(int_wtr &lt;- i, states[<span class="number">0</span>], states[<span class="number">10</span>], states[<span class="number">20</span>], states[<span class="number">35</span>]);
-            }
+            <span class="macro">csv_entry!</span>(int_wtr &lt;- i, states[<span class="number">0</span>], states[<span class="number">10</span>], states[<span class="number">20</span>], states[<span class="number">35</span>]);
         }
     }
-    <span class="macro">python!</span>(<span class="string">"plot.py"</span>);
-    <span class="kw">if </span>args.npy.is_some() {
-        <span class="macro">python!</span>(<span class="string">"plot.py"</span>, <span class="string">"int_states.csv"</span>);
-    }
+    <span class="macro">python!</span>(<span class="string">"plot.py"</span>, <span class="string">"data/network_test.csv"</span>);
+    <span class="macro">python!</span>(<span class="string">"plot.py"</span>, <span class="string">"data/int_states.csv"</span>);
 }
 
 <span class="kw">pub fn </span>train(args: <span class="kw">super</span>::TrainArgs) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>Error&gt;&gt; {
@@ -337,7 +324,7 @@
     <span class="kw">let </span>test_inputs = <span class="kw-2">&amp;</span>inputs[(inputs.len() <span class="kw">as </span>f64 * args.split) <span class="kw">as </span>usize..];
     <span class="kw">let </span>targets = <span class="kw-2">&amp;</span>targets[<span class="number">0</span>..train_len];
 
-    <span class="kw">let </span>pb = create_progress_bar(args.iter);
+    <span class="kw">let </span>pb = create_progress_bar(<span class="string">"Training..."</span>, args.iter);
 
     <span class="kw">let </span><span class="kw-2">mut </span>errors = Vec::with_capacity(args.iter <span class="kw">as </span>usize);
 
@@ -353,9 +340,12 @@
         </span>weight_history.assign(<span class="kw-2">&amp;</span>nw.weights_res_out);
 
         <span class="kw">let </span>error = <span class="kw">match </span>args.mode {
-            TrainMode::Inv =&gt; nw.train_step(train_inputs, targets),
+            TrainMode::Inv =&gt; nw.train_step(train_inputs, targets, (i <span class="kw">as </span>usize * <span class="number">15</span>) % <span class="number">31</span>),
             TrainMode::Grad =&gt; nw.train_mse_grad(train_inputs, targets),
         };
+
+        <span class="comment">// important...
+        </span>nw.reset_state();
 
         errors.push(error);
         pb.inc(<span class="number">1</span>);

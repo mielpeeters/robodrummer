@@ -96,6 +96,10 @@
 <a href="#94" id="94">94</a>
 <a href="#95" id="95">95</a>
 <a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
 </pre></div><pre class="rust"><code><span class="doccomment">/*!
 * This crate contains all code for the RoboDrummer project.
 *
@@ -176,20 +180,24 @@
 * know which beats will be played and which won't.
 */
 
-</span><span class="kw">mod </span>activation;
-<span class="kw">mod </span>arpeggio;
+</span><span class="kw">pub mod </span>activation;
+<span class="kw">pub mod </span>arpeggio;
 <span class="kw">pub mod </span>commands;
 <span class="kw">pub mod </span>constants;
 <span class="kw">pub mod </span>data;
-<span class="kw">mod </span>errors;
-<span class="kw">mod </span>guier;
+<span class="kw">pub mod </span>errors;
+<span class="kw">pub mod </span>guier;
+<span class="kw">pub mod </span>hyper;
+<span class="kw">pub mod </span>messages;
+<span class="kw">pub mod </span>metronomer;
 <span class="kw">pub mod </span>midier;
 <span class="kw">pub mod </span>midiutils;
 <span class="kw">pub mod </span>oscutil;
 <span class="kw">pub mod </span>reservoir;
 <span class="kw">pub mod </span>robot;
 <span class="kw">pub mod </span>series;
+<span class="kw">pub mod </span>test_robot;
 <span class="kw">pub mod </span>trainutil;
-<span class="kw">mod </span>tui;
-<span class="kw">mod </span>utils;
+<span class="kw">pub mod </span>tui;
+<span class="kw">pub mod </span>utils;
 </code></pre></div></section></main></body></html>

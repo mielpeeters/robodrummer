@@ -176,7 +176,7 @@ pub struct TrainArgs {
     #[arg(long)]
     pub npy: Option<String>,
 
-    /// Shift the target data to achieve delay compensation [ms]
+    /// Shift the target data to achieve delay compensation \[ms\]
     #[arg(long)]
     pub shift: Option<u8>,
 
@@ -476,15 +476,15 @@ nest! {
                 /// This does include delay compensation.
                 pub Robot,
             },
-        /// The shift at which the rhythmic activity model was trained [ms]
+        /// The shift at which the rhythmic activity model was trained \[ms\]
         #[arg(short, long, default_value_t = 0.0)]
         pub shift: f64,
 
-        /// The amount of delay compensation to apply [ms]
+        /// The amount of delay compensation to apply \[ms\]
         #[arg(short, long, default_value_t = 0.0)]
         pub delay: f64,
 
-        /// The timestep of the network output [ms]
+        /// The timestep of the network output \[ms\]
         #[arg(short, long, default_value_t = 2.0)]
         pub timestep: f64,
     }

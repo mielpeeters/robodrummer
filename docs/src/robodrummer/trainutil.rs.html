@@ -55,6 +55,10 @@
 <a href="#53" id="53">53</a>
 <a href="#54" id="54">54</a>
 <a href="#55" id="55">55</a>
+<a href="#56" id="56">56</a>
+<a href="#57" id="57">57</a>
+<a href="#58" id="58">58</a>
+<a href="#59" id="59">59</a>
 </pre></div><pre class="rust"><code><span class="doccomment">/*!
   This module provides some functionality for training the network.
 */
@@ -87,11 +91,15 @@
     container.push(Array1::from_iter(data.iter().cloned()));
 }
 
-<span class="kw">pub fn </span>create_progress_bar(len: u64) -&gt; ProgressBar {
+<span class="kw">pub fn </span>create_progress_bar(task: <span class="kw-2">&amp;</span>str, len: u64) -&gt; ProgressBar {
     <span class="kw">let </span>pb = ProgressBar::new(len);
     pb.set_style(
         ProgressStyle::with_template(
-            <span class="string">"Training...  {bar:40.green/black}  {pos} / {len}  eta: {eta}"</span>,
+            <span class="macro">format!</span>(
+                <span class="string">"{}  {{bar:40.green/black}}  {{pos}} / {{len}}  eta: {{eta}}"</span>,
+                task
+            )
+            .as_str(),
         )
         .unwrap()
         .progress_chars(<span class="string">"━━─"</span>),

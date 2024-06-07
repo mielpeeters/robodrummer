@@ -55,7 +55,7 @@
         }
     }
 
-    <span class="kw">pub fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; u8 {
+    <span class="kw">pub fn </span>next_note(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; u8 {
         <span class="self">self</span>.current = (<span class="self">self</span>.current + <span class="number">1</span>) % <span class="self">self</span>.chord.len();
         <span class="self">self</span>.chord[<span class="self">self</span>.current]
     }

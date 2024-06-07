@@ -202,16 +202,18 @@
 <a href="#200" id="200">200</a>
 <a href="#201" id="201">201</a>
 <a href="#202" id="202">202</a>
-<a href="#203" id="203">203</a>
-<a href="#204" id="204">204</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     sync::mpsc::{<span class="self">self</span>, Sender},
+    thread,
     time::Duration,
 };
 
-<span class="kw">use crate</span>::{midier, tui::messages::MidiTuiMessage};
+<span class="kw">use crate</span>::{
+    messages::{MidiNoteMessage, MidiTuiMessage},
+    midier,
+};
 
-<span class="kw">use </span><span class="kw">super</span>::MidiBrokerArgs;
+<span class="kw">use super</span>::{MidiBrokerArgs, OUTPUT_PORT};
 <span class="kw">use </span>midi_control::{KeyEvent, MidiNote};
 
 <span class="kw">const </span>FILTER_SIZE: usize = <span class="number">8</span>;
@@ -284,44 +286,8 @@
     }
 }
 
-<span class="kw">fn </span>single(
-    rx: mpsc::Receiver&lt;(u64, KeyEvent)&gt;,
-    publisher: zmq::Socket,
-    tui_sender: <span class="prelude-ty">Option</span>&lt;Sender&lt;MidiTuiMessage&gt;&gt;,
-) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
-    <span class="kw">let </span><span class="kw-2">mut </span>midi_filter = MidiFilter::&lt;<span class="number">1</span>&gt;::new(<span class="number">1</span>, <span class="number">100_000</span>);
-
-    <span class="kw">loop </span>{
-        <span class="comment">// wait for incomming midi messages
-        </span><span class="kw">let </span>received = rx.recv_timeout(Duration::from_millis(<span class="number">100</span>));
-        <span class="kw">if let </span><span class="prelude-val">Ok</span>((timestamp, keyevent)) = received {
-            midi_filter.add(timestamp, keyevent);
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(chord) = midi_filter.chord_played() {
-                publisher.send(chord.clone(), <span class="number">0</span>)<span class="question-mark">?</span>;
-                <span class="comment">// update the TUI
-                </span><span class="kw">if let </span><span class="prelude-val">Some</span>(sender) = <span class="kw-2">&amp;</span>tui_sender {
-                    <span class="kw">if </span>sender.send(MidiTuiMessage::MidiNotes(chord)).is_err() {
-                        <span class="comment">// connection is not live anymore, close this thread
-                        </span><span class="kw">break</span>;
-                    }
-                }
-            }
-        } <span class="kw">else </span>{
-            <span class="comment">// check if connection is alive
-            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(sender) = <span class="kw-2">&amp;</span>tui_sender {
-                <span class="kw">if </span>sender.send(MidiTuiMessage::Heartbeat).is_err() {
-                    <span class="comment">// connection is not live anymore, close this thread
-                    </span><span class="kw">break</span>;
-                }
-            }
-        }
-    }
-
-    <span class="prelude-val">Ok</span>(())
-}
-
 <span class="kw">fn </span>chord(
-    rx: mpsc::Receiver&lt;(u64, KeyEvent)&gt;,
+    rx: mpsc::Receiver&lt;(u64, u8, KeyEvent)&gt;,
     publisher: zmq::Socket,
     chord_size: usize,
     tui_sender: <span class="prelude-ty">Option</span>&lt;Sender&lt;MidiTuiMessage&gt;&gt;,
@@ -332,10 +298,11 @@
     <span class="kw">loop </span>{
         <span class="comment">// wait for incomming midi messages
         </span><span class="kw">let </span>received = rx.recv_timeout(Duration::from_millis(<span class="number">100</span>));
-        <span class="kw">if let </span><span class="prelude-val">Ok</span>((timestamp, keyevent)) = received {
+        <span class="kw">if let </span><span class="prelude-val">Ok</span>((timestamp, <span class="kw">_</span>, keyevent)) = received {
             midi_filter.add(timestamp, keyevent);
             <span class="kw">if let </span><span class="prelude-val">Some</span>(chord) = midi_filter.chord_played() {
-                publisher.send(chord.clone(), <span class="number">0</span>)<span class="question-mark">?</span>;
+                <span class="kw">let </span>msg = MidiNoteMessage::InputNotes(chord.clone());
+                publisher.send(msg.to_bytes()<span class="question-mark">?</span>, <span class="number">0</span>)<span class="question-mark">?</span>;
                 <span class="comment">// update the TUI
                 </span><span class="kw">if let </span><span class="prelude-val">Some</span>(sender) = <span class="kw-2">&amp;</span>tui_sender {
                     <span class="kw">if </span>sender.send(MidiTuiMessage::MidiNotes(chord)).is_err() {
@@ -369,6 +336,23 @@
     }
 }
 
+<span class="kw">fn </span>publish_output(rx: mpsc::Receiver&lt;(u64, u8, KeyEvent)&gt;) {
+    <span class="comment">// set up zmq pubish channel
+    </span><span class="kw">let </span>context = zmq::Context::new();
+    <span class="kw">let </span>publisher = context.socket(zmq::PUB).unwrap();
+    publisher
+        .bind(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"ipc:///tmp/zmq_robodrummer_{}"</span>, OUTPUT_PORT))
+        .unwrap();
+
+    <span class="kw">loop </span>{
+        <span class="kw">let </span>midi_msg = rx.recv().unwrap();
+        <span class="macro">println!</span>(<span class="string">"channel: {}. {:?}"</span>, midi_msg.<span class="number">1</span>, midi_msg.<span class="number">2</span>);
+
+        <span class="kw">let </span>msg = MidiNoteMessage::OutputNote.to_bytes().unwrap();
+        publisher.send(<span class="kw-2">&amp;</span>msg, <span class="number">0</span>).unwrap();
+    }
+}
+
 <span class="doccomment">/// handle midi incomping messages
 </span><span class="kw">pub fn </span>broke(
     args: MidiBrokerArgs,
@@ -377,10 +361,10 @@
     <span class="comment">// set up zmq pubish channel
     </span><span class="kw">let </span>context = zmq::Context::new();
     <span class="kw">let </span>publisher = context.socket(zmq::PUB)<span class="question-mark">?</span>;
-    publisher.bind(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"tcp://*:{}"</span>, args.port))<span class="question-mark">?</span>;
+    publisher.bind(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"ipc:///tmp/zmq_robodrummer_{}"</span>, args.port))<span class="question-mark">?</span>;
 
     <span class="comment">// set up midi input connection
-    </span><span class="kw">let </span>rx = midier::setup_midi_receiver(args.channel, args.device);
+    </span><span class="kw">let </span>rx = midier::setup_midi_receiver(args.channel, args.key_in, args.device);
 
     send_if_error(tui_sender.as_ref(), <span class="kw-2">&amp;</span>rx);
 
@@ -391,8 +375,20 @@
         }
     };
 
+    <span class="comment">// start the output midi sender if needed
+    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(channel) = args.output_publish {
+        <span class="macro">println!</span>(<span class="string">"Setting up midi robot output callback"</span>);
+        <span class="kw">let </span>channel = <span class="kw">match </span>channel {
+            <span class="number">0 </span>=&gt; <span class="prelude-val">None</span>,
+            c =&gt; <span class="prelude-val">Some</span>(c),
+        };
+        <span class="macro">println!</span>(<span class="string">"Channel: {:?}"</span>, channel);
+        <span class="kw">let </span>rx2 = midier::setup_midi_receiver(channel, args.key_out, <span class="prelude-val">None</span>).unwrap();
+        thread::spawn(<span class="kw">move </span>|| publish_output(rx2));
+    }
+
     <span class="kw">let </span>res = <span class="kw">match </span>args.mode {
-        <span class="kw">super</span>::BrokerMode::Single =&gt; single(rx, publisher, tui_sender.clone()),
+        <span class="kw">super</span>::BrokerMode::Single =&gt; chord(rx, publisher, <span class="number">1</span>, tui_sender.clone()),
         <span class="kw">super</span>::BrokerMode::Chord =&gt; chord(rx, publisher, args.chord_size, tui_sender.clone()),
     };
 

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["get_last_sent","get_last_sent_timeout"]};

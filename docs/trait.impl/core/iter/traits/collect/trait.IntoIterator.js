@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"robodrummer":[["impl&lt;'a&gt; <a class=\"trait\" href=\"https://doc.rust-lang.org/1.77.2/core/iter/traits/collect/trait.IntoIterator.html\" title=\"trait core::iter::traits::collect::IntoIterator\">IntoIterator</a> for &amp;'a <a class=\"struct\" href=\"robodrummer/metronomer/spectrum/struct.Spectrum.html\" title=\"struct robodrummer::metronomer::spectrum::Spectrum\">Spectrum</a>"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()

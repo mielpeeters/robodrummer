@@ -521,6 +521,120 @@
 <a href="#519" id="519">519</a>
 <a href="#520" id="520">520</a>
 <a href="#521" id="521">521</a>
+<a href="#522" id="522">522</a>
+<a href="#523" id="523">523</a>
+<a href="#524" id="524">524</a>
+<a href="#525" id="525">525</a>
+<a href="#526" id="526">526</a>
+<a href="#527" id="527">527</a>
+<a href="#528" id="528">528</a>
+<a href="#529" id="529">529</a>
+<a href="#530" id="530">530</a>
+<a href="#531" id="531">531</a>
+<a href="#532" id="532">532</a>
+<a href="#533" id="533">533</a>
+<a href="#534" id="534">534</a>
+<a href="#535" id="535">535</a>
+<a href="#536" id="536">536</a>
+<a href="#537" id="537">537</a>
+<a href="#538" id="538">538</a>
+<a href="#539" id="539">539</a>
+<a href="#540" id="540">540</a>
+<a href="#541" id="541">541</a>
+<a href="#542" id="542">542</a>
+<a href="#543" id="543">543</a>
+<a href="#544" id="544">544</a>
+<a href="#545" id="545">545</a>
+<a href="#546" id="546">546</a>
+<a href="#547" id="547">547</a>
+<a href="#548" id="548">548</a>
+<a href="#549" id="549">549</a>
+<a href="#550" id="550">550</a>
+<a href="#551" id="551">551</a>
+<a href="#552" id="552">552</a>
+<a href="#553" id="553">553</a>
+<a href="#554" id="554">554</a>
+<a href="#555" id="555">555</a>
+<a href="#556" id="556">556</a>
+<a href="#557" id="557">557</a>
+<a href="#558" id="558">558</a>
+<a href="#559" id="559">559</a>
+<a href="#560" id="560">560</a>
+<a href="#561" id="561">561</a>
+<a href="#562" id="562">562</a>
+<a href="#563" id="563">563</a>
+<a href="#564" id="564">564</a>
+<a href="#565" id="565">565</a>
+<a href="#566" id="566">566</a>
+<a href="#567" id="567">567</a>
+<a href="#568" id="568">568</a>
+<a href="#569" id="569">569</a>
+<a href="#570" id="570">570</a>
+<a href="#571" id="571">571</a>
+<a href="#572" id="572">572</a>
+<a href="#573" id="573">573</a>
+<a href="#574" id="574">574</a>
+<a href="#575" id="575">575</a>
+<a href="#576" id="576">576</a>
+<a href="#577" id="577">577</a>
+<a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
+<a href="#603" id="603">603</a>
+<a href="#604" id="604">604</a>
+<a href="#605" id="605">605</a>
+<a href="#606" id="606">606</a>
+<a href="#607" id="607">607</a>
+<a href="#608" id="608">608</a>
+<a href="#609" id="609">609</a>
+<a href="#610" id="610">610</a>
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
+<a href="#613" id="613">613</a>
+<a href="#614" id="614">614</a>
+<a href="#615" id="615">615</a>
+<a href="#616" id="616">616</a>
+<a href="#617" id="617">617</a>
+<a href="#618" id="618">618</a>
+<a href="#619" id="619">619</a>
+<a href="#620" id="620">620</a>
+<a href="#621" id="621">621</a>
+<a href="#622" id="622">622</a>
+<a href="#623" id="623">623</a>
+<a href="#624" id="624">624</a>
+<a href="#625" id="625">625</a>
+<a href="#626" id="626">626</a>
+<a href="#627" id="627">627</a>
+<a href="#628" id="628">628</a>
+<a href="#629" id="629">629</a>
+<a href="#630" id="630">630</a>
+<a href="#631" id="631">631</a>
+<a href="#632" id="632">632</a>
+<a href="#633" id="633">633</a>
+<a href="#634" id="634">634</a>
+<a href="#635" id="635">635</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     collections::VecDeque,
     sync::{
@@ -528,18 +642,18 @@
         mpsc::{<span class="self">self</span>, Sender},
         Arc, Mutex,
     },
-    thread::sleep,
+    thread::{<span class="self">self</span>, sleep},
     time::{Duration, Instant},
 };
 
 <span class="kw">use crate</span>::{
     guier::Gui,
+    messages::{CombinerMessage, MidiNoteMessage},
     midier,
     robot::{<span class="self">self</span>, WaveType},
-    tui::messages::CombinerMessage,
 };
 
-<span class="kw">use </span>midi_control::{ControlEvent, KeyEvent, MidiMessage, MidiMessageSend};
+<span class="kw">use </span>midi_control::{ControlEvent, KeyEvent, MidiMessage};
 
 <span class="kw">use super</span>::{ArpeggioArgs, CCArgs, CombinerArgs};
 <span class="kw">use </span><span class="kw">crate</span>::arpeggio::Arpeggio;
@@ -586,6 +700,56 @@
     }
 }
 
+<span class="kw">type </span>Prediction = (Instant, f32);
+
+<span class="kw">pub struct </span>PredictionBuffer {
+    <span class="kw">pub </span>buffer: VecDeque&lt;Prediction&gt;,
+}
+
+<span class="kw">impl </span>PredictionBuffer {
+    <span class="kw">pub fn </span>new(shift: f64, timestep: f64) -&gt; <span class="self">Self </span>{
+        <span class="comment">// max needed size for delay compenstation, add 10 for why-not's sake
+        </span><span class="kw">let </span>size = (shift / timestep) <span class="kw">as </span>usize + <span class="number">10</span>;
+
+        <span class="kw">let </span><span class="kw-2">mut </span>deque = VecDeque::with_capacity(size);
+        <span class="kw">let </span>instant = Instant::now();
+
+        <span class="kw">for _ in </span><span class="number">0</span>..size {
+            deque.push_back((instant, <span class="number">0.0</span>));
+        }
+
+        <span class="self">Self </span>{ buffer: deque }
+    }
+
+    <span class="kw">pub fn </span>add(<span class="kw-2">&amp;mut </span><span class="self">self</span>, prediction: Prediction) {
+        <span class="self">self</span>.buffer.pop_back();
+        <span class="self">self</span>.buffer.push_front(prediction);
+    }
+
+    <span class="kw">pub fn </span>get_closest(<span class="kw-2">&amp;</span><span class="self">self</span>, instant: Instant) -&gt; (f32, f64) {
+        <span class="kw">let </span><span class="kw-2">mut </span>closest = <span class="self">self</span>.buffer.front().unwrap();
+        <span class="kw">let </span><span class="kw-2">mut </span>min_diff = duration_pos_neg(closest.<span class="number">0</span>, instant);
+        <span class="kw">for </span>pred <span class="kw">in </span><span class="self">self</span>.buffer.iter() {
+            <span class="kw">let </span>diff = duration_pos_neg(pred.<span class="number">0</span>, instant);
+            <span class="kw">if </span>diff &lt; min_diff {
+                min_diff = diff;
+                closest = pred;
+            }
+        }
+
+        (closest.<span class="number">1</span>, min_diff)
+    }
+}
+
+<span class="kw">fn </span>duration_pos_neg(moment_one: Instant, moment_two: Instant) -&gt; f64 {
+    <span class="kw">let </span>diff = moment_one.duration_since(moment_two).as_secs_f64();
+    <span class="kw">if </span>diff == <span class="number">0.0 </span>{
+        moment_two.duration_since(moment_one).as_secs_f64()
+    } <span class="kw">else </span>{
+        diff
+    }
+}
+
 <span class="doccomment">/// Non-blocking receiving calls to the receiver until the last value has been retreived
 </span><span class="kw">fn </span>get_last_sent&lt;T&gt;(rx: <span class="kw-2">&amp;</span>mpsc::Receiver&lt;T&gt;) -&gt; <span class="prelude-ty">Option</span>&lt;T&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>last = <span class="prelude-val">None</span>;
@@ -599,8 +763,22 @@
     nw_output &gt; threshold
 }
 
-<span class="kw">fn </span>freq_subd_to_wait(time_wait: f64, subd: u8) -&gt; f64 {
+<span class="attr">#[allow(unused)]
+</span><span class="kw">fn </span>freq_subd_to_wait(time_wait: f64, subd: u8) -&gt; f64 {
     time_wait / f64::from(subd)
+}
+
+<span class="kw">fn </span>ms_to_dur(ms: f64) -&gt; Duration {
+    Duration::from_secs_f64(ms / <span class="number">1000.0</span>)
+}
+
+<span class="kw">fn </span>s_to_dur(s: f64) -&gt; Duration {
+    Duration::from_secs_f64(s)
+}
+
+<span class="kw">fn </span>show_time(start: Instant, time: Instant) -&gt; String {
+    <span class="kw">let </span>elapsed = time - start;
+    <span class="macro">format!</span>(<span class="string">"{:.1} ms"</span>, elapsed.as_secs_f64() * <span class="number">1000.0</span>)
 }
 
 <span class="kw">fn </span>drum_robot_loop(
@@ -613,78 +791,111 @@
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
     <span class="comment">// inform the user of robotic output
     </span>gui.add_row(<span class="string">"Robot"</span>, <span class="string">""</span>);
-    gui.add_row(<span class="string">"Network"</span>, <span class="number">0</span>);
-    gui.add_row(<span class="string">"Wait Secs"</span>, <span class="number">0</span>);
+    gui.add_row(<span class="string">"Now"</span>, <span class="number">0</span>);
+    gui.add_row(<span class="string">"Quantize Interval"</span>, <span class="number">0</span>);
+    gui.add_row(<span class="string">"Sent Beat For Time"</span>, <span class="number">0</span>);
+    gui.add_row(<span class="string">"metro"</span>, <span class="number">0</span>);
 
     <span class="comment">// create the beat sender
     </span><span class="kw">let </span>beat_send = Arc::new(AtomicBool::new(<span class="bool-val">false</span>));
 
     <span class="comment">// start the output stream
-    </span><span class="kw">let </span>_stream = robot::start(Arc::clone(<span class="kw-2">&amp;</span>beat_send), WaveType::Pulse(<span class="number">0.3</span>));
+    </span><span class="kw">let </span>_stream = robot::start(Arc::clone(<span class="kw-2">&amp;</span>beat_send), WaveType::Saw(<span class="number">0.15</span>));
 
     <span class="comment">// wait for the first metronome signal
-    </span><span class="kw">let </span><span class="kw-2">mut </span>metro = metro_rx.recv()<span class="question-mark">?</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>nw_output = <span class="number">0.0</span>;
+    </span><span class="kw">let </span>quantization_interval = metro_rx.recv()<span class="question-mark">? </span>/ (args.subdivision <span class="kw">as </span>f64);
+    <span class="kw">let </span><span class="kw-2">mut </span>quantization_interval = s_to_dur(quantization_interval);
 
-    <span class="comment">// create an agenda of future events
-    </span><span class="kw">let </span>output_agenda: Arc&lt;Mutex&lt;VecDeque&lt;Instant&gt;&gt;&gt; = Arc::new(Mutex::new(VecDeque::new()));
+    <span class="comment">// Get the output delay duration
+    </span><span class="kw">let </span>delay = ms_to_dur(drum_args.delay);
 
-    <span class="comment">// start the output thread using the output agenda
-    </span><span class="kw">let </span>local_output_agenda = Arc::clone(<span class="kw-2">&amp;</span>output_agenda);
-    <span class="kw">let </span>_handle = std::thread::spawn(<span class="kw">move </span>|| <span class="kw">loop </span>{
-        <span class="comment">// NOTE: this assumes that the outputs are ordered
-        </span><span class="kw">let </span>front_val = {
-            <span class="kw">let </span><span class="kw-2">mut </span>out = local_output_agenda.lock().unwrap();
-            out.pop_front()
-        };
-        <span class="kw">match </span>front_val {
-            <span class="prelude-val">Some</span>(time) =&gt; {
-                <span class="kw">let </span>now = Instant::now();
-                <span class="kw">let </span>time_left = time.checked_duration_since(now);
-                <span class="kw">if let </span><span class="prelude-val">Some</span>(wait) = time_left {
-                    <span class="comment">// TMP: this one should be made a lot more accurate probably
-                    </span>sleep(wait);
-                }
-                beat_send.store(<span class="bool-val">true</span>, Ordering::Relaxed);
+    <span class="kw">let </span><span class="kw-2">mut </span>next_metro = Instant::now() + quantization_interval - delay;
+
+    <span class="kw">let </span>predictions = Arc::new(Mutex::new(PredictionBuffer::new(
+        drum_args.shift,
+        drum_args.timestep,
+    )));
+
+    <span class="kw">let </span>loop_time = Duration::from_millis(<span class="number">5</span>);
+    <span class="kw">let </span><span class="kw-2">mut </span>iter = <span class="number">0</span>;
+
+    <span class="kw">let </span>start = Instant::now();
+
+    <span class="kw">let </span>predictions_clone = Arc::clone(<span class="kw-2">&amp;</span>predictions);
+    <span class="kw">let </span>shift = ms_to_dur(drum_args.shift);
+    <span class="kw">let </span>_handle = thread::spawn(<span class="kw">move </span>|| {
+        <span class="kw">loop </span>{
+            <span class="kw">let </span>now = Instant::now();
+            <span class="comment">// get last network output
+            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(nw) = get_last_sent(<span class="kw-2">&amp;</span>nw_rx) {
+                <span class="kw">let </span>future = now + shift;
+                <span class="macro">log::debug!</span>(<span class="string">"Got prediction for {}"</span>, show_time(start, future));
+                predictions_clone.lock().unwrap().add((future, nw));
             }
-            <span class="prelude-val">None </span>=&gt; {
-                <span class="comment">// NOTE: this could lead to some additional delays
-                </span>sleep(Duration::from_millis(<span class="number">5</span>));
-            }
+
+            sleep(Duration::from_millis(<span class="number">1</span>));
         }
     });
 
     <span class="kw">loop </span>{
-        <span class="comment">// check if we need to send an output in some time
-        </span>nw_output = get_last_sent(<span class="kw-2">&amp;</span>nw_rx).unwrap_or(nw_output);
-        gui.update_row(<span class="string">"Network"</span>, <span class="kw-2">&amp;</span>nw_output);
-        <span class="kw">if </span>threshold_nw(nw_output, args.threshold) {
-            <span class="kw">let </span>now = Instant::now();
-            <span class="kw">let </span>next_time = now + Duration::from_secs_f64(drum_args.offset)
-                - Duration::from_secs_f64(drum_args.delay);
-            <span class="kw">let </span><span class="kw-2">mut </span>out = output_agenda.lock().unwrap();
-            out.push_back(next_time);
-            drop(out);
-        }
+        <span class="kw">let </span>now = Instant::now();
 
-        <span class="comment">// get the last metronome reading
-        </span>metro = get_last_sent(<span class="kw-2">&amp;</span>metro_rx).unwrap_or(metro);
-        <span class="kw">let </span>wait_secs = freq_subd_to_wait(metro, args.subdivision);
-        gui.update_row(<span class="string">"Wait Secs"</span>, <span class="kw-2">&amp;</span>wait_secs);
-        gui.show();
+        gui.update_row(<span class="string">"Now"</span>, <span class="kw-2">&amp;</span>show_time(start, now));
 
-        <span class="comment">// send output to tui if needed
-        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(sender) = <span class="kw-2">&amp;</span>tui_sender {
-            <span class="kw">if </span>sender
-                .send(CombinerMessage::Output((<span class="number">0.0</span>, nw_output.into())))
-                .is_err()
-            {
-                <span class="comment">// stop thread if sender is disconnected
-                </span><span class="kw">break</span>;
+        <span class="comment">// check if we are on a quantized interval
+        </span><span class="kw">if </span>now &gt; next_metro {
+            <span class="comment">// get the prediction value at Instant::now() + delay
+            </span><span class="kw">let </span>(prediction, err) = predictions.lock().unwrap().get_closest(now + delay);
+
+            <span class="comment">// HACK: this threshold could be smarter
+            </span><span class="kw">if </span>err * <span class="number">1000.0 </span>&lt; drum_args.timestep * <span class="number">5.0 </span>{
+                <span class="macro">log::debug!</span>(
+                    <span class="string">"Prediction: {:.2}, Error: {:.2} ms"</span>,
+                    prediction,
+                    err * <span class="number">1000.0
+                </span>);
+                <span class="comment">// send the beat if the network output is above threshold
+                </span><span class="kw">if </span>threshold_nw(prediction, args.threshold) {
+                    beat_send.store(<span class="bool-val">true</span>, Ordering::Relaxed);
+                    gui.update_row(<span class="string">"Sent Beat For Time"</span>, <span class="kw-2">&amp;</span>show_time(start, now + delay));
+                }
+
+                <span class="comment">// update the next metronome instant
+                </span>next_metro += quantization_interval;
             }
         }
 
-        sleep(Duration::from_secs_f64(wait_secs));
+        <span class="comment">// update the metronome value if needed
+        </span>quantization_interval = get_last_sent(<span class="kw-2">&amp;</span>metro_rx)
+            .map(|m| {
+                <span class="kw">let </span>res = ms_to_dur(m * <span class="number">1000.0 </span>/ (args.subdivision <span class="kw">as </span>f64));
+                gui.update_row(
+                    <span class="string">"Quantize Interval"</span>,
+                    <span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"{:.1} ms"</span>, res.as_secs_f64() * <span class="number">1000.0</span>),
+                );
+                gui.show();
+                res
+            })
+            .unwrap_or(quantization_interval);
+
+        <span class="kw">if </span>iter % <span class="number">10 </span>== <span class="number">0 </span>{
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(sender) = <span class="kw-2">&amp;</span>tui_sender {
+                <span class="kw">if </span>sender.send(CombinerMessage::Heartbeat).is_err() {
+                    <span class="kw">break</span>;
+                }
+            }
+        }
+
+        <span class="kw">if </span>iter % <span class="number">2 </span>== <span class="number">0 </span>{
+            gui.show();
+        }
+
+        iter += <span class="number">1</span>;
+
+        <span class="kw">let </span>remaining = loop_time - now.elapsed();
+        <span class="kw">if </span>remaining &gt; Duration::from_secs(<span class="number">0</span>) {
+            sleep(remaining);
+        }
     }
 
     <span class="prelude-val">Ok</span>(())
@@ -708,7 +919,7 @@
     };
 
     <span class="comment">// connect to the midi output
-    </span><span class="kw">let </span><span class="kw-2">mut </span>midi_out = midier::create_midi_output_and_connect()<span class="question-mark">?</span>;
+    </span><span class="kw">let </span><span class="kw-2">mut </span>midi_out = midier::create_midi_output_and_connect(args.device)<span class="question-mark">?</span>;
 
     gui.add_row(<span class="string">"playing"</span>, <span class="bool-val">false</span>);
 
@@ -729,7 +940,7 @@
         }
 
         <span class="kw">if </span>playing {
-            midier::send_note(<span class="kw-2">&amp;mut </span>midi_out, <span class="number">1</span>, <span class="number">51</span>, <span class="number">50</span>);
+            midier::send_note(<span class="kw-2">&amp;mut </span>midi_out, <span class="number">3 </span>- <span class="number">1</span>, args.note, <span class="number">100</span>);
         }
 
         waiting_time = get_last_sent(<span class="kw-2">&amp;</span>wait_rx).unwrap_or(waiting_time);
@@ -744,8 +955,16 @@
             local_bpm = bpm;
         }
 
+        <span class="kw">if let </span><span class="prelude-val">Some</span>(sender) = <span class="kw-2">&amp;</span>tui_sender {
+            <span class="kw">if </span>sender.send(CombinerMessage::Heartbeat).is_err() {
+                <span class="kw">break</span>;
+            }
+        }
+
         sleep(wait_dur);
     }
+
+    <span class="prelude-val">Ok</span>(())
 }
 
 <span class="comment">// TODO: make every peak audible somehow
@@ -781,7 +1000,7 @@
 }
 
 <span class="kw">fn </span>cc_loop(
-    _args: CombinerArgs,
+    args: CombinerArgs,
     cc_args: CCArgs,
     <span class="kw-2">mut </span>gui: Gui,
     nw_rx: mpsc::Receiver&lt;f32&gt;,
@@ -789,7 +1008,7 @@
     tui_sender: <span class="prelude-ty">Option</span>&lt;Sender&lt;CombinerMessage&gt;&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
     <span class="comment">// connect to the midi output
-    </span><span class="kw">let </span><span class="kw-2">mut </span>midi_out = midier::create_midi_output_and_connect()<span class="question-mark">?</span>;
+    </span><span class="kw">let </span><span class="kw-2">mut </span>midi_out = midier::create_midi_output_and_connect(args.device)<span class="question-mark">?</span>;
 
     <span class="comment">// GUI output
     </span>gui.add_row(<span class="string">"cc target"</span>, cc_args.cc);
@@ -845,7 +1064,8 @@
 
         <span class="macro">log::info!</span>(<span class="string">"Sending message: {:?}"</span>, <span class="kw-2">&amp;</span>msg);
 
-        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = midi_out.send_message(msg) {
+        <span class="kw">let </span>buffer: Vec&lt;u8&gt; = msg.into();
+        <span class="kw">if let </span><span class="prelude-val">Err</span>(e) = midi_out.send(buffer.as_slice()) {
             <span class="macro">log::error!</span>(<span class="string">"Error sending midi message: {}"</span>, e);
         };
 
@@ -886,7 +1106,7 @@
     tui_sender: <span class="prelude-ty">Option</span>&lt;Sender&lt;CombinerMessage&gt;&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;(), Box&lt;<span class="kw">dyn </span>std::error::Error&gt;&gt; {
     <span class="comment">// connect to the midi output
-    </span><span class="kw">let </span>midi_out = midier::create_midi_output_and_connect()<span class="question-mark">?</span>;
+    </span><span class="kw">let </span>midi_out = midier::create_midi_output_and_connect(args.device)<span class="question-mark">?</span>;
 
     <span class="comment">// GUI output
     </span>gui.add_row(<span class="string">"chord"</span>, <span class="string">"None"</span>);
@@ -895,13 +1115,19 @@
 
     <span class="comment">// set up midi chord listener
     </span><span class="kw">let </span>midi_sub = context.socket(zmq::SUB).unwrap();
-    midi_sub.connect(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"tcp://localhost:{}"</span>, arp_args.midi_port))<span class="question-mark">?</span>;
+    midi_sub.connect(<span class="kw-2">&amp;</span><span class="macro">format!</span>(
+        <span class="string">"ipc:///tmp/zmq_robodrummer_{}"</span>,
+        arp_args.midi_port
+    ))<span class="question-mark">?</span>;
     midi_sub.set_subscribe(<span class="string">b""</span>)<span class="question-mark">?</span>;
 
     <span class="kw">let </span>(chord_tx, chord_rx) = mpsc::channel();
     <span class="kw">let </span>_handle = std::thread::spawn(<span class="kw">move </span>|| <span class="kw">loop </span>{
         <span class="kw">let </span>msg = midi_sub.recv_bytes(<span class="number">0</span>).unwrap();
-        <span class="kw">let </span><span class="kw-2">mut </span>chord = msg.to_vec();
+        <span class="kw">let </span>msg: MidiNoteMessage = bincode::deserialize(<span class="kw-2">&amp;</span>msg).unwrap();
+        <span class="kw">let </span>MidiNoteMessage::InputNotes(<span class="kw-2">mut </span>chord) = msg <span class="kw">else </span>{
+            <span class="kw">continue</span>;
+        };
         chord.reverse();
         <span class="kw">if </span>chord_tx.send(chord).is_err() {
             <span class="kw">break</span>;
@@ -934,29 +1160,29 @@
                 gui.show();
             };
 
-            midi_out.lock().unwrap().send_message(MidiMessage::NoteOn(
+            <span class="kw">let </span>msg: Vec&lt;u8&gt; = MidiMessage::NoteOn(
                 (arp_args.channel - <span class="number">1</span>).into(),
                 KeyEvent {
-                    key: arpeggio.next(),
+                    key: arpeggio.next_note(),
                     value: <span class="number">127</span>,
                 },
-            ))<span class="question-mark">?</span>;
+            )
+            .into();
+            midi_out.lock().unwrap().send(msg.as_slice())<span class="question-mark">?</span>;
 
             <span class="kw">let </span>midi_local = Arc::clone(<span class="kw-2">&amp;</span>midi_out);
             <span class="kw">let </span>to_stop = arpeggio.chord[arpeggio.current];
             <span class="kw">let </span>_handle = std::thread::spawn(<span class="kw">move </span>|| {
                 sleep(Duration::from_secs_f32(arpeggio.duration));
-                midi_local
-                    .lock()
-                    .unwrap()
-                    .send_message(MidiMessage::NoteOff(
-                        (arp_args.channel - <span class="number">1</span>).into(),
-                        KeyEvent {
-                            key: to_stop,
-                            value: <span class="number">0</span>,
-                        },
-                    ))
-                    .unwrap();
+                <span class="kw">let </span>msg: Vec&lt;u8&gt; = MidiMessage::NoteOff(
+                    (arp_args.channel - <span class="number">1</span>).into(),
+                    KeyEvent {
+                        key: to_stop,
+                        value: <span class="number">0</span>,
+                    },
+                )
+                .into();
+                midi_local.lock().unwrap().send(msg.as_slice()).unwrap();
             });
         }
 
@@ -997,13 +1223,13 @@
     <span class="comment">// connect to the metronome publisher
     </span><span class="kw">let </span>context = zmq::Context::new();
     <span class="kw">let </span>metronome = context.socket(zmq::SUB).unwrap();
-    metronome.connect(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"tcp://localhost:{}"</span>, args.metro_port))<span class="question-mark">?</span>;
+    metronome.connect(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"ipc:///tmp/zmq_robodrummer_{}"</span>, args.metro_port))<span class="question-mark">?</span>;
     <span class="comment">// listen to all messages from the metronome publisher
     </span>metronome.set_subscribe(<span class="string">b""</span>)<span class="question-mark">?</span>;
 
     <span class="comment">// connect to the rhythmic feel publisher
     </span><span class="kw">let </span>feel = context.socket(zmq::SUB).unwrap();
-    feel.connect(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"tcp://localhost:{}"</span>, args.feel_port))<span class="question-mark">?</span>;
+    feel.connect(<span class="kw-2">&amp;</span><span class="macro">format!</span>(<span class="string">"ipc:///tmp/zmq_robodrummer_{}"</span>, args.feel_port))<span class="question-mark">?</span>;
     <span class="comment">// listen to all messages from the rhythmic feel publisher
     </span>feel.set_subscribe(<span class="string">b""</span>)<span class="question-mark">?</span>;
 
@@ -1034,7 +1260,9 @@
         </span>gui.disable();
     }
 
-    <span class="kw">match </span>args.output {
+    <span class="kw">let </span>output = args.output.clone();
+
+    <span class="kw">match </span>output {
         <span class="kw">super</span>::OutputMode::Drum(d) =&gt; drum_loop(args, d, gui, wait_rx, nw_rx, tui_sender),
         <span class="kw">super</span>::OutputMode::Arpeggio(arp_args) =&gt; {
             arpeggio_loop(args, arp_args, gui, nw_rx, wait_rx, context, tui_sender)

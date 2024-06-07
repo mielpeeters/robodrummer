@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"fn":["create_midi_input_and_connect","create_midi_output_and_connect","send_beat","send_note","setup_midi_receiver"]};
+window.SIDEBAR_ITEMS = {"fn":["connect_output","create_midi_input_and_connect","create_midi_output","create_midi_output_and_connect","send_beat","send_note","setup_midi_receiver"]};
