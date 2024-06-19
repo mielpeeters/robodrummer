@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         robodrummer::commands::Command::GenerateData(g) => gendata(g),
         robodrummer::commands::Command::Completions(c) => update_completions(c),
         robodrummer::commands::Command::MidiBroker(m) => broke(m, None),
-        robodrummer::commands::Command::Combine(c) => combine(c, None),
+        robodrummer::commands::Command::Combine(c) => combine(c, None, None),
         robodrummer::commands::Command::Tui(t) => tui(t),
         robodrummer::commands::Command::Dev(d) => dev(d),
         robodrummer::commands::Command::Metronome(m) => metronome(m, None),

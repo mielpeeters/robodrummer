@@ -349,7 +349,7 @@ nest! {
 
         /// The device to listen on
         #[arg(long)]
-        pub device: Option<String>,
+        pub device: Option<u8>,
 
         /// Whether or not to output the midi messages of some channel
         #[arg(long)]
@@ -415,7 +415,7 @@ pub struct CombinerArgs {
 
     /// The MIDI device (if not given, is interactively asked)
     #[arg(long)]
-    pub device: Option<String>,
+    pub device: Option<u8>,
 
     /// The midi output note number
     #[arg(long, default_value_t = 60)]

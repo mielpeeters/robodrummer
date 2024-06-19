@@ -141,7 +141,6 @@
 <a href="#139" id="139">139</a>
 <a href="#140" id="140">140</a>
 <a href="#141" id="141">141</a>
-<a href="#142" id="142">142</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>std::{
     error::Error,
     sync::{mpsc::Sender, Arc, Mutex},
@@ -152,7 +151,6 @@
     data::{get_model_metadata, list_models},
     guier::Gui,
     messages::{MidiNoteMessage, NetworkMessage},
-    oscutil,
     reservoir::Reservoir,
 };
 <span class="kw">use </span>ndarray::Array1;
@@ -202,9 +200,9 @@
     midi_in.set_subscribe(<span class="string">b""</span>)<span class="question-mark">?</span>;
 
     <span class="comment">// set up osc output Socket
-    </span><span class="kw">let </span>osc_sock = oscutil::create_socket(args.osc_port);
+    // let osc_sock = oscutil::create_socket(args.osc_port)?;
 
-    <span class="kw">let </span><span class="kw-2">mut </span>gui = Gui::new(<span class="string">"Neuroner"</span>);
+    </span><span class="kw">let </span><span class="kw-2">mut </span>gui = Gui::new(<span class="string">"Neuroner"</span>);
     <span class="kw">let </span><span class="kw-2">mut </span>output = <span class="number">0.0</span>;
     gui.add_graph(<span class="string">"output"</span>, <span class="number">0.0</span>, <span class="number">1.0</span>);
     <span class="kw">if </span>tui_sender.is_some() {
@@ -248,13 +246,13 @@
         <span class="comment">// show and publish output
         </span><span class="kw">let </span>new_output = nw.get_output(<span class="number">0</span>);
         publisher.send((new_output <span class="kw">as </span>f32).to_be_bytes().as_slice(), <span class="number">0</span>)<span class="question-mark">?</span>;
-        oscutil::send_osc_msg(
-            <span class="string">"/robodrummer"</span>,
-            <span class="macro">vec!</span>[rosc::OscType::Float(new_output <span class="kw">as </span>f32)],
-            <span class="kw-2">&amp;</span>osc_sock,
-        );
+        <span class="comment">// oscutil::send_osc_msg(
+        //     "/robodrummer",
+        //     vec![rosc::OscType::Float(new_output as f32)],
+        //     &amp;osc_sock,
+        // );
 
-        <span class="comment">// send output to tui if needed
+        // send output to tui if needed
         </span><span class="kw">if let </span><span class="prelude-val">Some</span>(sender) = <span class="kw-2">&amp;</span>tui_sender {
             <span class="kw">if </span>sender.send(NetworkMessage::Output(new_output)).is_err() {
                 <span class="comment">// stop thread if sender is disconnected

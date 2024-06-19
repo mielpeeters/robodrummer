@@ -94,6 +94,17 @@
 <a href="#92" id="92">92</a>
 <a href="#93" id="93">93</a>
 <a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
+<a href="#96" id="96">96</a>
+<a href="#97" id="97">97</a>
+<a href="#98" id="98">98</a>
+<a href="#99" id="99">99</a>
+<a href="#100" id="100">100</a>
+<a href="#101" id="101">101</a>
+<a href="#102" id="102">102</a>
+<a href="#103" id="103">103</a>
+<a href="#104" id="104">104</a>
+<a href="#105" id="105">105</a>
 </pre></div><pre class="rust"><code><span class="doccomment">/*!
 * Messages that are sent to the TUI to inform about the child thread's states'
 */
@@ -118,6 +129,8 @@
 <span class="kw">pub enum </span>NetworkMessage {
     <span class="doccomment">/// The network's last output
     </span>Output(f64),
+    <span class="doccomment">/// Network encountered an error
+    </span>Error(String),
 }
 
 <span class="kw">pub enum </span>MetronomeMessage {
@@ -127,12 +140,19 @@
     </span>MidiOptions(Vec&lt;String&gt;),
     <span class="doccomment">/// The selected midi option
     </span>MidiSelected(usize),
+    <span class="doccomment">/// Metronome encountered an error
+    </span>Error(String),
 }
 
 <span class="kw">pub enum </span>CombinerMessage {
     <span class="doccomment">/// The output state at some percentage in the loop
     </span>Output((f64, f64)),
     Heartbeat,
+}
+
+<span class="doccomment">/// The TUI can send these messages to the combiner to update its operation in real time
+</span><span class="kw">pub enum </span>CombinerUpdate {
+    Threshold(f32),
 }
 
 <span class="attr">#[derive(Serialize, Deserialize, Debug)]
@@ -159,6 +179,7 @@
     <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>std::fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; std::fmt::Result {
         <span class="kw">match </span><span class="self">self </span>{
             NetworkMessage::Output(o) =&gt; <span class="macro">write!</span>(f, <span class="string">"{:.3}"</span>, o),
+            NetworkMessage::Error(e) =&gt; <span class="macro">write!</span>(f, <span class="string">"Reservoir error: {}"</span>, e),
         }
     }
 }
@@ -169,6 +190,7 @@
             MetronomeMessage::Tempo(t) =&gt; <span class="macro">write!</span>(f, <span class="string">"{:.2}"</span>, t),
             MetronomeMessage::MidiOptions(m) =&gt; <span class="macro">write!</span>(f, <span class="string">"{:?}"</span>, m),
             MetronomeMessage::MidiSelected(s) =&gt; <span class="macro">write!</span>(f, <span class="string">"Midi selected: {}"</span>, s),
+            MetronomeMessage::Error(e) =&gt; <span class="macro">write!</span>(f, <span class="string">"Metronome error: {}"</span>, e),
         }
     }
 }

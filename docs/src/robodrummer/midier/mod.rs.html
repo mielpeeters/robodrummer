@@ -262,6 +262,30 @@
 <a href="#260" id="260">260</a>
 <a href="#261" id="261">261</a>
 <a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
+<a href="#280" id="280">280</a>
+<a href="#281" id="281">281</a>
+<a href="#282" id="282">282</a>
+<a href="#283" id="283">283</a>
+<a href="#284" id="284">284</a>
+<a href="#285" id="285">285</a>
+<a href="#286" id="286">286</a>
 </pre></div><pre class="rust"><code><span class="kw">mod </span>errors;
 
 <span class="kw">use </span>std::{
@@ -325,7 +349,7 @@
 }
 
 <span class="kw">pub fn </span>create_midi_output_and_connect(
-    device: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    device: <span class="prelude-ty">Option</span>&lt;u8&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;midir::MidiOutputConnection, errors::MidiError&gt; {
     <span class="kw">let </span><span class="prelude-val">Ok</span>(output) = midir::MidiOutput::new(<span class="string">"midier output"</span>) <span class="kw">else </span>{
         <span class="kw">return </span><span class="prelude-val">Err</span>(errors::MidiError::CantCreateMidiOut);
@@ -334,11 +358,8 @@
     <span class="kw">let </span>ports = output.ports();
 
     <span class="kw">let </span>num = <span class="kw">if let </span><span class="prelude-val">Some</span>(device) = <span class="kw-2">&amp;</span>device {
-        ports
-            .iter()
-            .position(|port| check_midi_device(<span class="kw-2">&amp;</span>output.port_name(port).unwrap(), device))
-            .ok_or(errors::MidiError::DeviceNotFound(device.to_string()))<span class="question-mark">?
-    </span>} <span class="kw">else </span>{
+        <span class="kw-2">*</span>device <span class="kw">as </span>usize
+    } <span class="kw">else </span>{
         <span class="macro">println!</span>(<span class="string">"Available Midi ports to connect to:"</span>);
         <span class="kw">for </span>(i, port) <span class="kw">in </span>ports.iter().enumerate() {
             <span class="macro">println!</span>(<span class="string">"\t{i}: {}"</span>, output.port_name(port).unwrap());
@@ -363,10 +384,38 @@
     <span class="prelude-val">Ok</span>(conn)
 }
 
+<span class="kw">pub fn </span>available_devices(input: bool) -&gt; Vec&lt;String&gt; {
+    <span class="kw">if </span>input {
+        <span class="kw">let </span>midi = <span class="kw">match </span>midir::MidiInput::new(<span class="string">"midier input"</span>) {
+            <span class="prelude-val">Ok</span>(m) =&gt; m,
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="kw">return </span>Vec::new(),
+        };
+
+        <span class="kw">let </span><span class="kw-2">mut </span>devices = Vec::new();
+        <span class="kw">for </span>port <span class="kw">in </span>midi.ports() {
+            devices.push(midi.port_name(<span class="kw-2">&amp;</span>port).unwrap());
+        }
+
+        devices
+    } <span class="kw">else </span>{
+        <span class="kw">let </span>midi = <span class="kw">match </span>midir::MidiOutput::new(<span class="string">"midier output"</span>) {
+            <span class="prelude-val">Ok</span>(m) =&gt; m,
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="kw">return </span>Vec::new(),
+        };
+
+        <span class="kw">let </span><span class="kw-2">mut </span>devices = Vec::new();
+        <span class="kw">for </span>port <span class="kw">in </span>midi.ports() {
+            devices.push(midi.port_name(<span class="kw-2">&amp;</span>port).unwrap());
+        }
+
+        devices
+    }
+}
+
 <span class="kw">pub fn </span>create_midi_input_and_connect&lt;F, T: Send&gt;(
     callback: F,
     data: T,
-    device: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    device: <span class="prelude-ty">Option</span>&lt;u8&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;midir::MidiInputConnection&lt;T&gt;, errors::MidiError&gt;
 <span class="kw">where
     </span>F: FnMut(u64, <span class="kw-2">&amp;</span>[u8], <span class="kw-2">&amp;mut </span>T) + Send + <span class="lifetime">'static</span>,
@@ -378,11 +427,8 @@
     <span class="kw">let </span>ports = midi_in.ports();
 
     <span class="kw">let </span>num = <span class="kw">if let </span><span class="prelude-val">Some</span>(device) = device {
-        ports
-            .iter()
-            .position(|port| check_midi_device(<span class="kw-2">&amp;</span>midi_in.port_name(port).unwrap(), <span class="kw-2">&amp;</span>device))
-            .ok_or(errors::MidiError::DeviceNotFound(device))<span class="question-mark">?
-    </span>} <span class="kw">else </span>{
+        device <span class="kw">as </span>usize
+    } <span class="kw">else </span>{
         <span class="macro">println!</span>(<span class="string">"Available Midi ports to connect to:"</span>);
         <span class="kw">for </span>(i, port) <span class="kw">in </span>ports.iter().enumerate() {
             <span class="macro">println!</span>(<span class="string">"\t{i}: {}"</span>, midi_in.port_name(port).unwrap());
@@ -403,7 +449,8 @@
     <span class="prelude-val">Ok</span>(conn_in)
 }
 
-<span class="kw">fn </span>check_midi_device(available: <span class="kw-2">&amp;</span>str, device: <span class="kw-2">&amp;</span>str) -&gt; bool {
+<span class="attr">#[allow(unused)]
+</span><span class="kw">fn </span>check_midi_device(available: <span class="kw-2">&amp;</span>str, device: <span class="kw-2">&amp;</span>str) -&gt; bool {
     available.to_lowercase().contains(<span class="kw-2">&amp;</span>device.to_lowercase())
 }
 
@@ -430,7 +477,7 @@
 <span class="kw">pub fn </span>setup_midi_receiver(
     channel: <span class="prelude-ty">Option</span>&lt;u8&gt;,
     key: <span class="prelude-ty">Option</span>&lt;u8&gt;,
-    device: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    device: <span class="prelude-ty">Option</span>&lt;u8&gt;,
 ) -&gt; <span class="prelude-ty">Result</span>&lt;Receiver&lt;MidiNote&gt;, Box&lt;<span class="kw">dyn </span>Error&gt;&gt; {
     <span class="kw">let </span>done = Arc::new(AtomicBool::new(<span class="bool-val">false</span>));
     <span class="kw">let </span>done_clone = done.clone();
@@ -466,12 +513,13 @@
 
                     <span class="comment">// send the midi keyevent to the main thread
                     </span><span class="kw">if </span>tx_local.send((stamp, c, k)).is_err() {
-                        <span class="kw-2">*</span>no_connection_left_clone.<span class="number">0</span>.lock().unwrap() = <span class="bool-val">true</span>;
+                        <span class="comment">// there is no connection to the main thread anymore
+                        </span><span class="kw-2">*</span>no_connection_left_clone.<span class="number">0</span>.lock().unwrap() = <span class="bool-val">true</span>;
                         no_connection_left_clone.<span class="number">1</span>.notify_all()
                     };
                 };
             },
-            tx.clone(),
+            tx,
             device,
         );
 
@@ -496,7 +544,7 @@
             <span class="kw">return </span><span class="prelude-val">Err</span>(Box::new(e));
         }
 
-        thread::sleep(std::time::Duration::from_millis(<span class="number">100</span>));
+        thread::sleep(std::time::Duration::from_millis(<span class="number">10</span>));
     }
 
     <span class="prelude-val">Ok</span>(rx)

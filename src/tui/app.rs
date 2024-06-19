@@ -1,6 +1,10 @@
 use std::{
+    collections::VecDeque,
     io,
-    sync::mpsc::{self, Receiver, Sender},
+    sync::{
+        mpsc::{self, Receiver, Sender},
+        Arc, Mutex,
+    },
     thread,
 };
 
@@ -15,10 +19,11 @@ use tui_input::{backend::crossterm::EventHandler, Input};
 
 use crate::{
     commands::{
-        self, ArpeggioArgs, BrokerMode, CCArgs, CombinerArgs, DrumArgs, MetronomeArgs,
+        self, ArpeggioArgs, BrokerMode, CCArgs, CombinerArgs, DrumArgs, DrumOutput, MetronomeArgs,
         MidiBrokerArgs, OutputMode, RunArgs,
     },
-    messages::{CombinerMessage, MetronomeMessage, MidiTuiMessage, NetworkMessage},
+    messages::{CombinerMessage, CombinerUpdate, MetronomeMessage, MidiTuiMessage, NetworkMessage},
+    midier,
     utils::get_last_sent,
 };
 
@@ -31,10 +36,30 @@ macro_rules! check_parse {
         if $result.is_err() {
             $self.mode = AppMode::Error(
                 "Couldn't parse".into(),
-                "Please enter a valid channel number".into(),
+                "Please enter a valid answer".into(),
             );
             return;
         }
+    };
+    ($self:ident, $result:ident, $message:expr) => {
+        if $result.is_err() {
+            $self.mode = AppMode::Error("Couldn't parse".into(), $message.into());
+            return;
+        }
+    };
+}
+
+macro_rules! ask_question {
+    ($self:ident, $question:expr, $next:expr) => {
+        $self.question = $question.into();
+        $self.input.reset();
+        $self.mode = AppMode::Setup($next, false);
+    };
+    ($self:ident, $question:expr, $next:expr, $options:expr ) => {
+        $self.question = $question.into();
+        $self.input.reset();
+        $self.options = $options.iter().map(|s| s.to_string()).collect();
+        $self.mode = AppMode::Setup($next, true);
     };
 }
 
@@ -53,6 +78,7 @@ pub enum AppMode {
 #[allow(dead_code)] // the fields whose functionalities are not implemented yet
 pub struct App {
     mode: AppMode,
+    errors: Arc<Mutex<VecDeque<(String, String)>>>,
     network: Vec<(f64, f64)>,
     network_min: f64,
     network_max: f64,
@@ -75,6 +101,7 @@ pub struct App {
     metronome_rx: Receiver<MetronomeMessage>,
     nw_rx: Receiver<NetworkMessage>,
     combiner_rx: Receiver<CombinerMessage>,
+    combiner_tx: Sender<CombinerUpdate>,
 }
 
 impl Default for App {
@@ -82,9 +109,11 @@ impl Default for App {
         let (metronome_tx, metronome_rx) = mpsc::channel();
         let (midi_tx, midi_rx) = mpsc::channel();
         let (_, combiner_rx) = mpsc::channel();
+        let (combiner_tx, _) = mpsc::channel();
 
         Self {
             mode: Default::default(),
+            errors: Arc::new(Mutex::new(VecDeque::new())),
             network: Default::default(),
             network_min: Default::default(),
             network_max: Default::default(),
@@ -105,6 +134,7 @@ impl Default for App {
             metronome_tx,
             metronome_rx,
             combiner_rx,
+            combiner_tx,
             nw_rx: {
                 let (_, rx) = mpsc::channel();
                 rx
@@ -113,14 +143,6 @@ impl Default for App {
     }
 }
 
-// impl Default for App {
-//     fn default() -> Self {
-//         Self {
-
-//         }
-//     }
-// }
-
 impl App {
     /// runs the application's main loop until the user quits
     pub fn run(&mut self, terminal: &mut super::ui::Tui) -> io::Result<()> {
@@ -128,6 +150,7 @@ impl App {
             terminal.draw(|frame| self.render_frame(frame))?;
             self.handle_events()?;
             self.handle_messages();
+            self.handle_errors();
         }
         Ok(())
     }
@@ -160,6 +183,19 @@ impl App {
         }
         while let Some(message) = get_last_sent(&self.metronome_rx) {
             self.handle_metronome_message(message);
+        }
+        while let Some(message) = get_last_sent(&self.combiner_rx) {
+            self.handle_combiner_message(message);
+        }
+    }
+
+    fn handle_errors(&mut self) {
+        let Ok(mut errors) = self.errors.try_lock() else {
+            return;
+        };
+
+        if let Some(error) = errors.pop_front() {
+            self.mode = AppMode::Error(format!("Component {} errored", error.0), error.1);
         }
     }
 
@@ -196,7 +232,23 @@ impl App {
                 KeyCode::Tab => {
                     self.active_pane = (self.active_pane + 1) % 4;
                 }
-                _ => {}
+                _ => {
+                    if self.active_pane == 3 {
+                        match key_event.code {
+                            KeyCode::Char('+') | KeyCode::Char('=') => {
+                                // increase the threshold with 0.05
+                                self.combiner_args.threshold += 0.05;
+                                let _ = self.combiner_tx.send(CombinerUpdate::Threshold(0.05));
+                            }
+                            KeyCode::Char('-') | KeyCode::Char('_') => {
+                                // decrease the threshold with 0.05
+                                self.combiner_args.threshold -= 0.05;
+                                let _ = self.combiner_tx.send(CombinerUpdate::Threshold(-0.05));
+                            }
+                            _ => {}
+                        }
+                    }
+                }
             },
             AppMode::Setup(_, _) => match key_event.code {
                 KeyCode::Enter => {
@@ -224,29 +276,23 @@ impl App {
             0 => {
                 // drop old connection
                 (_, self.midi_rx) = mpsc::channel();
-                self.question = "Enter the midi channel to listen on".into();
-                self.input.reset();
-                // start at first question
-                self.mode = AppMode::Setup(0, false);
+                ask_question!(self, "Enter the midi channel to listen on [1-16]", 0);
             }
             1 => {
                 // drop old connection and setup new one
                 (_, self.metronome_rx) = mpsc::channel();
-                self.question = "Press enter to start the metronome device".into();
-                self.mode = AppMode::Setup(0, false);
+                ask_question!(self, "Press enter to start the metronome device", 0);
             }
             2 => {
-                self.question = "Enter the model's name".into();
-                self.input.reset();
-                // start at first question
-                self.mode = AppMode::Setup(0, false);
+                ask_question!(self, "Enter the model's name", 0);
             }
             3 => {
-                self.question = "Select an output mode".into();
-                self.options = vec!["Drum".into(), "Arpeggio".into(), "CC".into()];
-                self.input.reset();
-                // start at first question
-                self.mode = AppMode::Setup(0, true);
+                ask_question!(
+                    self,
+                    "Select an output mode",
+                    0,
+                    ["Drum MIDI", "Drum Robot", "Arpeggio", "CC"]
+                );
             }
             _ => {
                 todo!()
@@ -257,199 +303,240 @@ impl App {
     fn handle_setup_input(&mut self) {
         match self.active_pane {
             // MIDI
-            0 => {
-                match self.mode {
-                    AppMode::Setup(0, _) => {
-                        let channel = self.input.value().parse();
-                        self.input.reset();
-                        check_parse!(self, channel);
-                        self.midi_args.channel = Some(channel.unwrap());
-                        self.question = "Enter the midi mode to listen on [Single/chord]".into();
-                        self.mode = AppMode::Setup(1, false);
-                    }
-                    AppMode::Setup(1, _) => {
-                        // handle last question and quit setup mode
-                        let mode = self.input.value();
-                        match mode {
-                            "chord" => {
-                                self.midi_args.mode = BrokerMode::Chord;
-                                self.question = "Enter the chord size".into();
-                                self.input.reset();
-                                self.mode = AppMode::Setup(2, false);
-                            }
-                            _ => {
-                                self.midi_args.mode = BrokerMode::Single;
-                                self.question = "Enter the device name".into();
-                                self.input.reset();
-                                self.mode = AppMode::Setup(3, false);
-                            }
-                        };
-                    }
-                    AppMode::Setup(2, _) => {
-                        let chord_size = self.input.value().parse();
-                        check_parse!(self, chord_size);
-                        self.midi_args.chord_size = chord_size.unwrap();
-                        self.question = "Enter the device name".into();
-                        self.input.reset();
-                        self.mode = AppMode::Setup(3, false);
-                    }
-                    AppMode::Setup(3, _) => {
-                        self.midi_args.device = Some(self.input.value().to_string());
-                        self.question = "".into();
-                        self.input.reset();
-                        self.midi_args.output_publish = None;
-                        self.start_midi();
-                        self.mode = AppMode::Normal;
-                    }
-                    _ => {
-                        self.mode = AppMode::Normal;
-                    }
-                }
-            }
+            0 => self.handle_midi_setup(),
             // METRONOME
             1 => {
                 // start the metronome
                 self.start_metronome();
                 self.mode = AppMode::Normal;
             }
-            2 => match self.mode {
-                AppMode::Setup(0, _) => {
-                    let model = self.input.value();
-                    self.network_args.model = model.into();
-                    self.input.reset();
-                    self.question = "Enter the timestep [ms]".into();
-                    self.mode = AppMode::Setup(1, false);
-                }
-                AppMode::Setup(1, _) => {
-                    let timestep = self.input.value();
-                    let timestep = timestep.parse();
-                    check_parse!(self, timestep);
-                    self.network_args.timestep = timestep.unwrap();
-                    self.input.reset();
-                    self.start_network();
-                    self.mode = AppMode::Normal;
-                }
-                _ => {
-                    self.mode = AppMode::Normal;
-                }
-            },
+            2 => self.handle_network_setup(),
             // COMBINER
-            3 => match self.mode {
-                AppMode::Setup(0, _) => {
-                    let mode: Result<usize, _> = self.input.value().parse();
-                    check_parse!(self, mode);
-                    self.input.reset();
-                    self.combiner_args.output = match mode.unwrap() {
-                        0 => {
-                            // DRUM
-                            self.question = "Select an output note".into();
-                            self.mode = AppMode::Setup(2, false);
-                            OutputMode::Drum(DrumArgs::default())
-                        }
-                        1 => {
-                            // ARPEGGIO
-                            self.question = "Device name to connect to".into();
-                            self.mode = AppMode::Setup(5, false);
-                            OutputMode::Arpeggio(ArpeggioArgs::default())
-                        }
-                        2 => {
-                            // CC
-                            self.question = "Device name to connect to".into();
-                            self.mode = AppMode::Setup(16, false);
-                            OutputMode::CC(CCArgs::default())
-                        }
-                        _ => todo!(),
-                        // TODO: implement the others
-                    };
-                }
-                AppMode::Setup(2, _) => {
-                    let note: Result<u8, _> = self.input.value().parse();
-                    check_parse!(self, note);
-                    self.combiner_args.note = note.unwrap();
-                    self.question = "Enter a threshold value".into();
-                    self.input.reset();
-                    self.mode = AppMode::Setup(3, false);
-                }
-                AppMode::Setup(3, _) => {
-                    let threshold: Result<f32, _> = self.input.value().parse();
-                    check_parse!(self, threshold);
-                    self.combiner_args.threshold = threshold.unwrap();
-                    self.question = "How much to subdivide the metronome beat?".into();
-                    self.input.reset();
-                    self.mode = AppMode::Setup(4, false);
-                }
-                AppMode::Setup(4, _) => {
-                    let subdivision = self.input.value().parse();
-                    check_parse!(self, subdivision);
-                    self.combiner_args.subdivision = subdivision.unwrap();
-                    self.question = "".into();
-                    self.input.reset();
-                    self.start_combiner();
-                    self.mode = AppMode::Normal;
-                }
-                AppMode::Setup(5, _) => {
-                    // ARPEGGIO, channel question
-                    let device = self.input.value();
-                    self.combiner_args.device = Some(device.into());
+            3 => self.handle_combiner_setup(),
+            _ => {}
+        }
+    }
 
-                    self.question = "".into();
-                    self.question = "What midi channel to output to?".into();
-                    self.input.reset();
-                    self.mode = AppMode::Setup(6, false);
-                }
-                AppMode::Setup(6, _) => {
-                    // ARPEGGIO, channel question
-                    let channel = self.input.value().parse();
-                    check_parse!(self, channel);
-                    self.arpeggio_args.channel = channel.unwrap();
+    fn handle_midi_setup(&mut self) {
+        let AppMode::Setup(step, _) = self.mode else {
+            return;
+        };
 
-                    self.question = "Give a subdivision amount".into();
-                    self.input.reset();
-                    self.mode = AppMode::Setup(7, false);
-                }
-                AppMode::Setup(7, _) => {
-                    let subdivision = self.input.value().parse();
-                    check_parse!(self, subdivision);
-                    self.combiner_args.subdivision = subdivision.unwrap();
+        match step {
+            0 => {
+                let channel = self.input.value().parse();
+                check_parse!(self, channel, "Enter a valid channel [1-16]");
+                self.midi_args.channel = Some(channel.unwrap());
+                ask_question!(self, "Enter the midi mode to listen on [Single/chord]", 1);
+            }
+            1 => {
+                // handle last question and quit setup mode
+                let mode = self.input.value();
+                match mode {
+                    "chord" => {
+                        self.midi_args.mode = BrokerMode::Chord;
+                        ask_question!(self, "Enter the chord size", 2);
+                    }
+                    _ => {
+                        self.midi_args.mode = BrokerMode::Single;
+                        let options = midier::available_devices(true);
+                        ask_question!(self, "Select the input device", 3, options);
+                    }
+                };
+            }
+            2 => {
+                let chord_size = self.input.value().parse();
+                check_parse!(self, chord_size, "Enter a valid (integer) chord size");
+                self.midi_args.chord_size = chord_size.unwrap();
+                let options = midier::available_devices(true);
+                ask_question!(self, "Enter the input device name", 3, options);
+            }
+            3 => {
+                let device = self.input.value().parse();
+                check_parse!(self, device, "Enter a valid device number");
+                self.midi_args.device = Some(device.unwrap());
+                self.midi_args.output_publish = None;
+                self.start_midi();
+                self.mode = AppMode::Normal;
+            }
+            _ => {
+                self.mode = AppMode::Normal;
+            }
+        }
+    }
 
-                    self.combiner_args.output = OutputMode::Arpeggio(self.arpeggio_args.clone());
-                    self.question = "".into();
-                    self.input.reset();
-                    self.start_combiner();
-                    self.mode = AppMode::Normal;
-                }
-                AppMode::Setup(16, _) => {
-                    // ARPEGGIO, channel question
-                    let device = self.input.value();
-                    self.combiner_args.device = Some(device.into());
+    fn handle_network_setup(&mut self) {
+        match self.mode {
+            AppMode::Setup(0, _) => {
+                let model = self.input.value();
+                self.network_args.model = model.into();
+                ask_question!(self, "Enter the timestep [ms]", 1);
+            }
+            AppMode::Setup(1, _) => {
+                let timestep = self.input.value().parse();
+                check_parse!(self, timestep, "Enter a valid (float) timestep [ms]");
+                self.network_args.timestep = timestep.unwrap();
+                self.start_network();
+                self.mode = AppMode::Normal;
+            }
+            _ => {
+                self.mode = AppMode::Normal;
+            }
+        }
+    }
 
-                    self.question = "What midi channel to output to?".into();
-                    self.input.reset();
-                    self.mode = AppMode::Setup(17, false)
+    fn handle_combiner_setup(&mut self) {
+        match self.mode {
+            AppMode::Setup(0, _) => {
+                let mode: Result<usize, _> = self.input.value().parse();
+                check_parse!(self, mode, "Please enter a valid option");
+                self.input.reset();
+                self.combiner_args.output = match mode.unwrap() {
+                    0 => {
+                        // DRUM MIDI
+                        ask_question!(
+                            self,
+                            "Select an output device",
+                            1,
+                            midier::available_devices(false)
+                        );
+                        OutputMode::Drum(DrumArgs::default())
+                    }
+                    1 => {
+                        // DRUM ROBOTIC
+                        let drumargs = DrumArgs {
+                            output: DrumOutput::Robot,
+                            ..Default::default()
+                        };
+                        ask_question!(self, "Enter the model's shift [ms]", 20);
+                        OutputMode::Drum(drumargs)
+                    }
+                    2 => {
+                        // ARPEGGIO
+                        let options = midier::available_devices(false);
+                        ask_question!(self, "Select output midi device", 5, options);
+                        OutputMode::Arpeggio(ArpeggioArgs::default())
+                    }
+                    3 => {
+                        // CC
+                        let options = midier::available_devices(false);
+                        ask_question!(self, "Select output midi device", 16, options);
+                        OutputMode::CC(CCArgs::default())
+                    }
+                    _ => {
+                        self.mode = AppMode::Error(
+                            "Invalid option".into(),
+                            "Please enter a valid option".into(),
+                        );
+                        return;
+                    }
+                };
+            }
+            AppMode::Setup(1, _) => {
+                let device = self.input.value().parse();
+                check_parse!(self, device, "Please enter a valid device number");
+                self.combiner_args.device = Some(device.unwrap());
+                ask_question!(self, "Select an output note", 2);
+            }
+            AppMode::Setup(2, _) => {
+                let note: Result<u8, _> = self.input.value().parse();
+                check_parse!(self, note, "Please enter a valid note");
+                self.combiner_args.note = note.unwrap();
+                ask_question!(self, "Enter a threshold value", 3);
+            }
+            AppMode::Setup(3, _) => {
+                let threshold: Result<f32, _> = self.input.value().parse();
+                check_parse!(self, threshold, "Please enter a valid threshold [float]");
+                self.combiner_args.threshold = threshold.unwrap();
+                ask_question!(self, "How much to subdivide the metronome beat?", 4);
+            }
+            AppMode::Setup(4, _) => {
+                let subdivision = self.input.value().parse();
+                check_parse!(
+                    self,
+                    subdivision,
+                    "Please enter a valid subdivision [integer]"
+                );
+                self.combiner_args.subdivision = subdivision.unwrap();
+                self.question = "".into();
+                self.input.reset();
+                self.start_combiner();
+                self.mode = AppMode::Normal;
+            }
+            AppMode::Setup(20, _) => {
+                let shift = self.input.value().parse();
+                check_parse!(self, shift, "Enter a valid shift [ms]");
+                if let OutputMode::Drum(ref mut drumargs) = self.combiner_args.output {
+                    drumargs.shift = shift.unwrap();
                 }
-                AppMode::Setup(17, _) => {
-                    // CC, channel question
-                    let channel = self.input.value().parse();
-                    check_parse!(self, channel);
-                    self.cc_args.channel = channel.unwrap();
+                ask_question!(self, "Enter the robot's delay [ms]", 21);
+            }
+            AppMode::Setup(21, _) => {
+                let delay = self.input.value().parse();
+                check_parse!(self, delay, "Enter a valid delay [ms]");
+                if let OutputMode::Drum(ref mut drumargs) = self.combiner_args.output {
+                    drumargs.delay = delay.unwrap();
+                }
+                ask_question!(self, "Enter a threshold value [float]", 3);
+            }
+            AppMode::Setup(5, _) => {
+                // ARPEGGIO, channel question
+                let device = self.input.value().parse();
+                check_parse!(self, device, "Please enter a valid device number");
+                self.combiner_args.device = Some(device.unwrap());
 
-                    self.question = "Which CC value should be adjusted".into();
-                    self.input.reset();
-                    self.mode = AppMode::Setup(18, false)
-                }
-                AppMode::Setup(18, _) => {
-                    let cc = self.input.value().parse();
-                    check_parse!(self, cc);
-                    self.cc_args.cc = cc.unwrap();
+                ask_question!(self, "What midi channel to output to?", 6);
+            }
+            AppMode::Setup(6, _) => {
+                // ARPEGGIO, channel question
+                let channel = self.input.value().parse();
+                check_parse!(self, channel, "Please enter a valid channel [1-16]");
+                self.arpeggio_args.channel = channel.unwrap();
 
-                    self.question = "".into();
-                    self.input.reset();
-                    self.combiner_args.output = OutputMode::CC(self.cc_args.clone());
-                    self.start_combiner();
-                    self.mode = AppMode::Normal;
-                }
-                _ => {}
-            },
+                ask_question!(self, "Give a subdivision amount", 7);
+            }
+            AppMode::Setup(7, _) => {
+                let subdivision = self.input.value().parse();
+                check_parse!(
+                    self,
+                    subdivision,
+                    "Please enter a valid subdivision [integer]"
+                );
+                self.combiner_args.subdivision = subdivision.unwrap();
+
+                self.combiner_args.output = OutputMode::Arpeggio(self.arpeggio_args.clone());
+                self.question = "".into();
+                self.input.reset();
+                self.start_combiner();
+                self.mode = AppMode::Normal;
+            }
+            AppMode::Setup(16, _) => {
+                // ARPEGGIO, channel question
+                let device = self.input.value().parse();
+                check_parse!(self, device, "Please enter a valid device number");
+                self.combiner_args.device = Some(device.unwrap());
+
+                ask_question!(self, "What midi channel to output to?", 17);
+            }
+            AppMode::Setup(17, _) => {
+                // CC, channel question
+                let channel = self.input.value().parse();
+                check_parse!(self, channel, "Please enter a valid channel [1-16]");
+                self.cc_args.channel = channel.unwrap();
+
+                ask_question!(self, "Which CC value should be adjusted", 18);
+            }
+            AppMode::Setup(18, _) => {
+                let cc = self.input.value().parse();
+                check_parse!(self, cc, "Please enter a valid CC value [integer 0-127]");
+                self.cc_args.cc = cc.unwrap();
+
+                self.question = "".into();
+                self.input.reset();
+                self.combiner_args.output = OutputMode::CC(self.cc_args.clone());
+                self.start_combiner();
+                self.mode = AppMode::Normal;
+            }
             _ => {}
         }
     }
@@ -458,30 +545,62 @@ impl App {
         let args = self.midi_args.clone();
         let (tx, rx) = mpsc::channel();
         self.midi_rx = rx;
-        // TODO: Midi message sender
-        thread::spawn(move || commands::broke(args, Some(tx)).unwrap());
+        let errors = Arc::clone(&self.errors);
+        thread::spawn(move || {
+            let _ = commands::broke(args, Some(tx)).map_err(|e| {
+                errors
+                    .lock()
+                    .unwrap()
+                    .push_back(("midi".to_string(), e.to_string()))
+            });
+        });
     }
 
     fn start_metronome(&mut self) {
         let args = MetronomeArgs::default();
         let (tx, rx) = mpsc::channel();
         self.metronome_rx = rx;
-        // TODO: Midi message sender
-        thread::spawn(move || commands::metronome(args, Some(tx)).unwrap());
+        let errors = Arc::clone(&self.errors);
+        thread::spawn(move || {
+            let _ = commands::metronome(args, Some(tx)).map_err(|e| {
+                errors
+                    .lock()
+                    .unwrap()
+                    .push_back(("metronome".to_string(), e.to_string()))
+            });
+        });
     }
 
     fn start_network(&mut self) {
         let args = self.network_args.clone();
         let (tx, rx) = mpsc::channel();
         self.nw_rx = rx;
-        thread::spawn(move || commands::run(args, Some(tx)).unwrap());
+        let errors = Arc::clone(&self.errors);
+        thread::spawn(move || {
+            let _ = commands::run(args, Some(tx)).map_err(|e| {
+                errors
+                    .lock()
+                    .unwrap()
+                    .push_back(("network".to_string(), e.to_string()))
+            });
+        });
     }
 
     fn start_combiner(&mut self) {
         let args = self.combiner_args.clone();
-        let (tx, rx) = mpsc::channel();
-        self.combiner_rx = rx;
-        thread::spawn(move || commands::combine(args, Some(tx)).unwrap());
+        let (comb_tx, comb_rx) = mpsc::channel();
+        self.combiner_rx = comb_rx;
+        let (update_tx, update_rx) = mpsc::channel();
+        self.combiner_tx = update_tx;
+        let errors = Arc::clone(&self.errors);
+        thread::spawn(move || {
+            let _ = commands::combine(args, Some(comb_tx), Some(update_rx)).map_err(|e| {
+                errors
+                    .lock()
+                    .unwrap()
+                    .push_back(("combiner".to_string(), e.to_string()))
+            });
+        });
     }
 
     fn handle_network_message(&mut self, message: NetworkMessage) {
@@ -499,6 +618,9 @@ impl App {
                     self.network.remove(0);
                 }
             }
+            NetworkMessage::Error(e) => {
+                self.mode = AppMode::Error("Reservoir error".into(), e);
+            }
         }
     }
 
@@ -511,6 +633,9 @@ impl App {
                 self.options = o;
             }
             MetronomeMessage::MidiSelected(_) => {}
+            MetronomeMessage::Error(e) => {
+                self.mode = AppMode::Error("Metronome error".into(), e);
+            }
         }
     }
 
@@ -527,6 +652,13 @@ impl App {
                 self.options = o;
             }
             MidiTuiMessage::MidiSelected(_) => {}
+        }
+    }
+
+    fn handle_combiner_message(&mut self, message: CombinerMessage) {
+        match message {
+            CombinerMessage::Heartbeat => {}
+            CombinerMessage::Output(_) => {}
         }
     }
 
@@ -584,8 +716,17 @@ impl App {
             ]));
             lines.push(Line::from(vec![
                 "threshold: ".into(),
-                self.combiner_args.threshold.to_string().yellow(),
+                format!("{:.2}", self.combiner_args.threshold).yellow(),
             ]));
+            if let OutputMode::Drum(drumargs) = self.combiner_args.output {
+                if matches!(drumargs.output, DrumOutput::Robot) {
+                    lines.push(Line::from(vec![
+                        "compensation: ".into(),
+                        format!("{:.2}", drumargs.delay).yellow(),
+                        " ms".into(),
+                    ]));
+                }
+            }
         }
 
         Text::from(lines)
@@ -618,14 +759,19 @@ impl App {
         self.exit = true;
     }
 }
-fn create_block(title: &str, active: bool) -> Block {
+
+fn create_block<'a>(
+    title: &'a str,
+    active: bool,
+    instructions: &[(&'a str, &'a str)],
+) -> Block<'a> {
     let border_style = if active {
         Style::default().fg(Color::LightGreen)
     } else {
         Style::default().fg(Color::DarkGray)
     };
 
-    Block::default()
+    let mut block = Block::default()
         .title(
             Title::from(title.bold())
                 .alignment(Alignment::Center)
@@ -633,7 +779,23 @@ fn create_block(title: &str, active: bool) -> Block {
         )
         .borders(Borders::ALL)
         .border_set(border::ROUNDED)
-        .border_style(border_style)
+        .border_style(border_style);
+
+    if active && !instructions.is_empty() {
+        let mut insns = vec![];
+        instructions.iter().for_each(|(action, key)| {
+            insns.push(format!(" {}: ", *action).into());
+            insns.push(format!("<{}> ", *key).bold());
+        });
+        let instructions = Title::from(Line::from(insns));
+        block = block.title(
+            instructions
+                .alignment(Alignment::Center)
+                .position(Position::Bottom),
+        );
+    }
+
+    block
 }
 
 impl Widget for &App {
@@ -662,7 +824,7 @@ impl Widget for &App {
             " Quit: ".into(),
             "<Q> ".bold(),
             "| Active Pane: ".into(),
-            "<tab> or [1-4] ".bold(),
+            "<tab> [1-4] [hjkl] ".bold(),
         ]));
 
         let status_line = Block::default()
@@ -675,25 +837,29 @@ impl Widget for &App {
             .border_set(border::ROUNDED)
             .border_style(Style::default().fg(Color::LightGreen));
 
-        let midi_block = create_block(" midi (1) ", self.active_pane == 0);
+        let midi_block = create_block(" midi (1) ", self.active_pane == 0, &[]);
         midi_block.render(top[0], buf);
         let midi_content = Layout::vertical([Constraint::Fill(1)])
             .margin(1)
             .split(top[0]);
 
-        let metro_block = create_block(" metronome (2) ", self.active_pane == 1);
+        let metro_block = create_block(" metronome (2) ", self.active_pane == 1, &[]);
         metro_block.render(top[1], buf);
         let metro_content = Layout::vertical([Constraint::Fill(1)])
             .margin(1)
             .split(top[1]);
 
-        let nw_block = create_block(" reservoir (3) ", self.active_pane == 2);
+        let nw_block = create_block(" reservoir (3) ", self.active_pane == 2, &[]);
         nw_block.render(bottom[0], buf);
         let nw_content = Layout::vertical([Constraint::Length(1), Constraint::Fill(1)])
             .margin(1)
             .split(bottom[0]);
 
-        let combine_block = create_block(" combiner (4) ", self.active_pane == 3);
+        let combine_block = create_block(
+            " combiner (4) ",
+            self.active_pane == 3,
+            &[("thresh", " +/- ")],
+        );
         combine_block.render(bottom[1], buf);
         let combine_content = Layout::vertical([Constraint::Fill(1)])
             .margin(1)
@@ -725,7 +891,7 @@ impl Widget for &App {
 
         match &self.mode {
             AppMode::Setup(_, false) => {
-                let popup_area = centered_rect(50, 20, area);
+                let popup_area = centered_rect(50, 20, 60, 7, area);
                 let popup = PopupInput {
                     title: "Setup",
                     question: &self.question,
@@ -736,7 +902,7 @@ impl Widget for &App {
                 popup.render(popup_area, buf);
             }
             AppMode::Setup(_, true) => {
-                let popup_area = centered_rect(50, 20, area);
+                let popup_area = centered_rect(50, 20, 60, 10, area);
                 let popup = PopupInput {
                     title: "Setup",
                     question: &self.question,
@@ -747,7 +913,7 @@ impl Widget for &App {
                 popup.render(popup_area, buf);
             }
             AppMode::Error(t, e) => {
-                let popup_area = centered_rect(50, 20, area);
+                let popup_area = centered_rect(50, 20, 60, 4, area);
                 let popup = PopupError { title: t, error: e };
                 popup.render(popup_area, buf);
             }
@@ -757,13 +923,13 @@ impl Widget for &App {
 }
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`
-fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
+fn centered_rect(percent_x: u16, percent_y: u16, min_x: u16, min_y: u16, r: Rect) -> Rect {
     // Cut the given rectangle into three vertical pieces
     let popup_layout = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Percentage((100 - percent_y) / 2),
-            Constraint::Percentage(percent_y),
+            Constraint::Min(min_y),
             Constraint::Percentage((100 - percent_y) / 2),
         ])
         .split(r);
@@ -773,7 +939,7 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
         .direction(Direction::Horizontal)
         .constraints([
             Constraint::Percentage((100 - percent_x) / 2),
-            Constraint::Percentage(percent_x),
+            Constraint::Min(min_x),
             Constraint::Percentage((100 - percent_x) / 2),
         ])
         .split(popup_layout[1])[1] // Return the middle chunk

@@ -8,7 +8,6 @@ use crate::{
     data::{get_model_metadata, list_models},
     guier::Gui,
     messages::{MidiNoteMessage, NetworkMessage},
-    oscutil,
     reservoir::Reservoir,
 };
 use ndarray::Array1;
@@ -58,7 +57,7 @@ pub fn run(
     midi_in.set_subscribe(b"")?;
 
     // set up osc output Socket
-    let osc_sock = oscutil::create_socket(args.osc_port);
+    // let osc_sock = oscutil::create_socket(args.osc_port)?;
 
     let mut gui = Gui::new("Neuroner");
     let mut output = 0.0;
@@ -104,11 +103,11 @@ pub fn run(
         // show and publish output
         let new_output = nw.get_output(0);
         publisher.send((new_output as f32).to_be_bytes().as_slice(), 0)?;
-        oscutil::send_osc_msg(
-            "/robodrummer",
-            vec![rosc::OscType::Float(new_output as f32)],
-            &osc_sock,
-        );
+        // oscutil::send_osc_msg(
+        //     "/robodrummer",
+        //     vec![rosc::OscType::Float(new_output as f32)],
+        //     &osc_sock,
+        // );
 
         // send output to tui if needed
         if let Some(sender) = &tui_sender {

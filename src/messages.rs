@@ -22,6 +22,8 @@ pub enum MidiTuiMessage {
 pub enum NetworkMessage {
     /// The network's last output
     Output(f64),
+    /// Network encountered an error
+    Error(String),
 }
 
 pub enum MetronomeMessage {
@@ -31,12 +33,19 @@ pub enum MetronomeMessage {
     MidiOptions(Vec<String>),
     /// The selected midi option
     MidiSelected(usize),
+    /// Metronome encountered an error
+    Error(String),
 }
 
 pub enum CombinerMessage {
     /// The output state at some percentage in the loop
     Output((f64, f64)),
     Heartbeat,
+}
+
+/// The TUI can send these messages to the combiner to update its operation in real time
+pub enum CombinerUpdate {
+    Threshold(f32),
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -63,6 +72,7 @@ impl Display for NetworkMessage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             NetworkMessage::Output(o) => write!(f, "{:.3}", o),
+            NetworkMessage::Error(e) => write!(f, "Reservoir error: {}", e),
         }
     }
 }
@@ -73,6 +83,7 @@ impl Display for MetronomeMessage {
             MetronomeMessage::Tempo(t) => write!(f, "{:.2}", t),
             MetronomeMessage::MidiOptions(m) => write!(f, "{:?}", m),
             MetronomeMessage::MidiSelected(s) => write!(f, "Midi selected: {}", s),
+            MetronomeMessage::Error(e) => write!(f, "Metronome error: {}", e),
         }
     }
 }

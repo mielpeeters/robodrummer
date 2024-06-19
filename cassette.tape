@@ -1,15 +1,15 @@
 Set Shell zsh
 
-Set TypingSpeed 100ms
-Set PlaybackSpeed 1.0 
+Set TypingSpeed 130ms
+Set PlaybackSpeed 0.7 
 
-Set Width 1400
-Set Height 1000
-Set FontSize 16
+Set Width 1920 
+Set Height 1620
+Set FontSize 24
+Set FontFamily "JetBrainsMono Nerd Font"
 Set Margin 80
 Set MarginFill "#FF9E3B"
 Set BorderRadius 10
-Set WindowBar Colorful
 Set Theme "Kanagawa"
 
 
@@ -49,7 +49,7 @@ Sleep 500ms
 Type "3_8"
 Enter
 Sleep 500ms
-Type "2"
+Type "8"
 Enter
 Type "l"
 Sleep 500ms

@@ -106,6 +106,8 @@
 <a href="#104" id="104">104</a>
 <a href="#105" id="105">105</a>
 <a href="#106" id="106">106</a>
+<a href="#107" id="107">107</a>
+<a href="#108" id="108">108</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>derive_setters::Setters;
 <span class="kw">use </span>ratatui::{
     prelude::<span class="kw-2">*</span>,
@@ -160,23 +162,25 @@
                 Paragraph::new(input).render(popup_chunks[<span class="number">1</span>], buf);
             }
             <span class="prelude-val">Some</span>(o) =&gt; {
+                <span class="kw">let </span>options_vec = o
+                    .iter()
+                    .enumerate()
+                    .map(|(i, o)| <span class="macro">format!</span>(<span class="string">"{}: {}"</span>, i, o))
+                    .collect::&lt;Vec&lt;String&gt;&gt;();
+
                 <span class="kw">let </span>popup_chunks = Layout::vertical([
                     Constraint::Length(<span class="number">1</span>),
-                    Constraint::Fill(<span class="number">1</span>),
+                    <span class="comment">// make sure that all options are displayed
+                    </span>Constraint::Min(options_vec.len() <span class="kw">as </span>u16),
                     Constraint::Length(<span class="number">1</span>),
                 ])
                 .margin(<span class="number">1</span>)
                 .split(area);
 
-                <span class="kw">let </span>options_string = o
-                    .iter()
-                    .enumerate()
-                    .map(|(i, o)| <span class="macro">format!</span>(<span class="string">"{}: {}"</span>, i, o))
-                    .collect::&lt;Vec&lt;String&gt;&gt;()
-                    .join(<span class="string">"\n"</span>);
-
-                <span class="kw">let </span>options =
-                    Text::styled(options_string, Style::default().fg(Color::LightBlue).bold());
+                <span class="kw">let </span>options = Text::styled(
+                    options_vec.join(<span class="string">"\n"</span>),
+                    Style::default().fg(Color::LightBlue).bold(),
+                );
 
                 Paragraph::new(question).render(popup_chunks[<span class="number">0</span>], buf);
                 Paragraph::new(options).render(popup_chunks[<span class="number">1</span>], buf);

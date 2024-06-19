@@ -2,7 +2,7 @@ use std::{
     collections::VecDeque,
     sync::{
         atomic::{AtomicBool, Ordering},
-        mpsc::{self, Sender},
+        mpsc::{self, Receiver, Sender},
         Arc, Mutex,
     },
     thread::{self, sleep},
@@ -11,7 +11,7 @@ use std::{
 
 use crate::{
     guier::Gui,
-    messages::{CombinerMessage, MidiNoteMessage},
+    messages::{CombinerMessage, CombinerUpdate, MidiNoteMessage},
     midier,
     robot::{self, WaveType},
 };
@@ -145,12 +145,13 @@ fn show_time(start: Instant, time: Instant) -> String {
 }
 
 fn drum_robot_loop(
-    args: CombinerArgs,
+    mut args: CombinerArgs,
     drum_args: super::DrumArgs,
     mut gui: Gui,
     metro_rx: mpsc::Receiver<f64>,
     nw_rx: mpsc::Receiver<f32>,
     tui_sender: Option<Sender<CombinerMessage>>,
+    tui_receiver: Option<Receiver<CombinerUpdate>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // inform the user of robotic output
     gui.add_row("Robot", "");
@@ -242,6 +243,16 @@ fn drum_robot_loop(
             .unwrap_or(quantization_interval);
 
         if iter % 10 == 0 {
+            if let Some(ref rcv) = tui_receiver {
+                if let Ok(update) = rcv.try_recv() {
+                    match update {
+                        CombinerUpdate::Threshold(t) => {
+                            args.threshold += t;
+                        }
+                    }
+                };
+            }
+
             if let Some(sender) = &tui_sender {
                 if sender.send(CombinerMessage::Heartbeat).is_err() {
                     break;
@@ -265,12 +276,13 @@ fn drum_robot_loop(
 }
 
 fn drum_loop(
-    args: CombinerArgs,
+    mut args: CombinerArgs,
     drum_args: super::DrumArgs,
     mut gui: Gui,
     wait_rx: mpsc::Receiver<f64>,
     nw_rx: mpsc::Receiver<f32>,
     tui_sender: Option<Sender<CombinerMessage>>,
+    tui_receiver: Option<Receiver<CombinerUpdate>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // GUI output
     gui.add_row("BPM", 120);
@@ -278,7 +290,15 @@ fn drum_loop(
 
     // split of into the robotic output if desired
     if let super::DrumOutput::Robot = drum_args.output {
-        return drum_robot_loop(args, drum_args, gui, wait_rx, nw_rx, tui_sender.clone());
+        return drum_robot_loop(
+            args,
+            drum_args,
+            gui,
+            wait_rx,
+            nw_rx,
+            tui_sender,
+            tui_receiver,
+        );
     };
 
     // connect to the midi output
@@ -294,6 +314,16 @@ fn drum_loop(
 
     loop {
         let nw_output = get_last_sent(&nw_rx);
+
+        if let Some(ref rcv) = tui_receiver {
+            if let Ok(update) = rcv.try_recv() {
+                match update {
+                    CombinerUpdate::Threshold(t) => {
+                        args.threshold += t;
+                    }
+                }
+            };
+        }
 
         if let Some(nw_play) = nw_output {
             playing = threshold_nw(nw_play, args.threshold);
@@ -582,6 +612,7 @@ fn arpeggio_loop(
 pub fn combine(
     args: CombinerArgs,
     tui_sender: Option<Sender<CombinerMessage>>,
+    tui_receiver: Option<Receiver<CombinerUpdate>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // connect to the metronome publisher
     let context = zmq::Context::new();
@@ -626,7 +657,9 @@ pub fn combine(
     let output = args.output.clone();
 
     match output {
-        super::OutputMode::Drum(d) => drum_loop(args, d, gui, wait_rx, nw_rx, tui_sender),
+        super::OutputMode::Drum(d) => {
+            drum_loop(args, d, gui, wait_rx, nw_rx, tui_sender, tui_receiver)
+        }
         super::OutputMode::Arpeggio(arp_args) => {
             arpeggio_loop(args, arp_args, gui, nw_rx, wait_rx, context, tui_sender)
         }

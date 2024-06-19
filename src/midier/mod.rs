@@ -61,7 +61,7 @@ pub fn connect_output(
 }
 
 pub fn create_midi_output_and_connect(
-    device: Option<String>,
+    device: Option<u8>,
 ) -> Result<midir::MidiOutputConnection, errors::MidiError> {
     let Ok(output) = midir::MidiOutput::new("midier output") else {
         return Err(errors::MidiError::CantCreateMidiOut);
@@ -70,10 +70,7 @@ pub fn create_midi_output_and_connect(
     let ports = output.ports();
 
     let num = if let Some(device) = &device {
-        ports
-            .iter()
-            .position(|port| check_midi_device(&output.port_name(port).unwrap(), device))
-            .ok_or(errors::MidiError::DeviceNotFound(device.to_string()))?
+        *device as usize
     } else {
         println!("Available Midi ports to connect to:");
         for (i, port) in ports.iter().enumerate() {
@@ -99,10 +96,38 @@ pub fn create_midi_output_and_connect(
     Ok(conn)
 }
 
+pub fn available_devices(input: bool) -> Vec<String> {
+    if input {
+        let midi = match midir::MidiInput::new("midier input") {
+            Ok(m) => m,
+            Err(_) => return Vec::new(),
+        };
+
+        let mut devices = Vec::new();
+        for port in midi.ports() {
+            devices.push(midi.port_name(&port).unwrap());
+        }
+
+        devices
+    } else {
+        let midi = match midir::MidiOutput::new("midier output") {
+            Ok(m) => m,
+            Err(_) => return Vec::new(),
+        };
+
+        let mut devices = Vec::new();
+        for port in midi.ports() {
+            devices.push(midi.port_name(&port).unwrap());
+        }
+
+        devices
+    }
+}
+
 pub fn create_midi_input_and_connect<F, T: Send>(
     callback: F,
     data: T,
-    device: Option<String>,
+    device: Option<u8>,
 ) -> Result<midir::MidiInputConnection<T>, errors::MidiError>
 where
     F: FnMut(u64, &[u8], &mut T) + Send + 'static,
@@ -114,10 +139,7 @@ where
     let ports = midi_in.ports();
 
     let num = if let Some(device) = device {
-        ports
-            .iter()
-            .position(|port| check_midi_device(&midi_in.port_name(port).unwrap(), &device))
-            .ok_or(errors::MidiError::DeviceNotFound(device))?
+        device as usize
     } else {
         println!("Available Midi ports to connect to:");
         for (i, port) in ports.iter().enumerate() {
@@ -139,6 +161,7 @@ where
     Ok(conn_in)
 }
 
+#[allow(unused)]
 fn check_midi_device(available: &str, device: &str) -> bool {
     available.to_lowercase().contains(&device.to_lowercase())
 }
@@ -166,7 +189,7 @@ type MidiNote = (u64, u8, KeyEvent);
 pub fn setup_midi_receiver(
     channel: Option<u8>,
     key: Option<u8>,
-    device: Option<String>,
+    device: Option<u8>,
 ) -> Result<Receiver<MidiNote>, Box<dyn Error>> {
     let done = Arc::new(AtomicBool::new(false));
     let done_clone = done.clone();
@@ -202,12 +225,13 @@ pub fn setup_midi_receiver(
 
                     // send the midi keyevent to the main thread
                     if tx_local.send((stamp, c, k)).is_err() {
+                        // there is no connection to the main thread anymore
                         *no_connection_left_clone.0.lock().unwrap() = true;
                         no_connection_left_clone.1.notify_all()
                     };
                 };
             },
-            tx.clone(),
+            tx,
             device,
         );
 
@@ -232,7 +256,7 @@ pub fn setup_midi_receiver(
             return Err(Box::new(e));
         }
 
-        thread::sleep(std::time::Duration::from_millis(100));
+        thread::sleep(std::time::Duration::from_millis(10));
     }
 
     Ok(rx)

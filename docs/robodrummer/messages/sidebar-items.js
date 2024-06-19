@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["CombinerMessage","MetronomeMessage","MidiNoteMessage","MidiTuiMessage","NetworkMessage"]};
+window.SIDEBAR_ITEMS = {"enum":["CombinerMessage","CombinerUpdate","MetronomeMessage","MidiNoteMessage","MidiTuiMessage","NetworkMessage"]};

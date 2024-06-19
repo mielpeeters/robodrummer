@@ -59,8 +59,15 @@
 <a href="#57" id="57">57</a>
 <a href="#58" id="58">58</a>
 <a href="#59" id="59">59</a>
+<a href="#60" id="60">60</a>
+<a href="#61" id="61">61</a>
+<a href="#62" id="62">62</a>
+<a href="#63" id="63">63</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>rosc::{encoder, OscError, OscMessage, OscPacket, OscType};
-<span class="kw">use </span>std::net::{SocketAddr, UdpSocket};
+<span class="kw">use </span>std::{
+    error::Error,
+    net::{SocketAddr, UdpSocket},
+};
 
 <span class="kw">pub fn </span>decode(buf: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;(String, Vec&lt;OscType&gt;), OscError&gt; {
     <span class="kw">let </span>(<span class="kw">_</span>, packet) = rosc::decoder::decode_udp(buf).unwrap();
@@ -77,9 +84,10 @@
     }))
     .unwrap()
 }
-<span class="kw">pub fn </span>create_socket(port: u16) -&gt; UdpSocket {
+<span class="kw">pub fn </span>create_socket(port: u16) -&gt; <span class="prelude-ty">Result</span>&lt;UdpSocket, Box&lt;<span class="kw">dyn </span>Error&gt;&gt; {
     <span class="kw">let </span>addr = SocketAddr::from(([<span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>, <span class="number">0</span>], port));
-    UdpSocket::bind(addr).unwrap()
+    <span class="kw">let </span>res = UdpSocket::bind(addr)<span class="question-mark">?</span>;
+    <span class="prelude-val">Ok</span>(res)
 }
 
 <span class="kw">pub fn </span>send_osc_msg(addr: <span class="kw-2">&amp;</span>str, msg: Vec&lt;rosc::OscType&gt;, socket: <span class="kw-2">&amp;</span>UdpSocket) {

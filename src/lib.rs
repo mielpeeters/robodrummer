@@ -15,7 +15,7 @@
 * system.
 * - [`combine`]: Combine the MIDI input, the model output, and the metronome output to create the
 * desired output.
-* - TODO: `metronome`: Currently not part of this crate, but a separate one.
+* - [`metronome`] : Currently not part of this crate, but a separate one.
 *
 * [`midi-broker`]: commands/fn.broke.html
 * [`combine`]: commands/fn.combine.html
@@ -23,6 +23,7 @@
 * [`generate-data`]: commands/fn.gendata.html
 * [`run`]: commands/fn.run.html
 * [`train`]: commands/fn.train.html
+* [`metronome`]: commands/fn.metronome.html
 *
 * # Compilation
 * Clone this repository, then run:
@@ -51,31 +52,10 @@
 * <br>
 * To run the trained model, you can run:
 * ```sh
-* robodrummer run --model my_model
+* robodrummer tui
 * ```
-* This will run the model, and publish the output on a ZMQ socket (default socket is 4321).
-*
-* <br>
-*
-* You will then need to run the metronome, which is a separate binary. (see metronomer crate)
-*
-* <br>
-*
-* You'll also need to run the MIDI broker:
-* ```sh
-* robodrummer midi-broker -m single
-* ```
-* It will ask you to select a MIDI device to get input from.
-* This process handles the midi input and publishes it on another ZMQ socket.
-*
-* <br>
-*
-* Finally, you can combine the output of the model, the metronome, and the MIDI input:
-* ```sh
-* robodrummer combine -s 4
-* ````
-* This will run the combiner, which subdivides the metronome signal, and thresholds the model to
-* know which beats will be played and which won't.
+* This will thart the Terminal User Interface, which will allow you to setup the just-trained model,
+* along with the other components (midi-broker, metronome, and output component).
 */
 
 pub mod activation;

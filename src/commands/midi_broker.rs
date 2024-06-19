@@ -107,29 +107,17 @@ fn chord(
                     }
                 }
             }
-        } else {
-            // check if connection is alive
-            if let Some(sender) = &tui_sender {
-                if sender.send(MidiTuiMessage::Heartbeat).is_err() {
-                    // connection is not live anymore, close this thread
-                    break;
-                }
+        }
+        // check if connection is alive
+        if let Some(sender) = &tui_sender {
+            if sender.send(MidiTuiMessage::Heartbeat).is_err() {
+                // connection is not live anymore, close this thread
+                break;
             }
         }
     }
 
     Ok(())
-}
-
-fn send_if_error<T>(
-    tui_sender: Option<&Sender<MidiTuiMessage>>,
-    value: &Result<T, Box<dyn std::error::Error>>,
-) {
-    if let Err(error) = value {
-        if let Some(sender) = tui_sender {
-            let _ = sender.send(MidiTuiMessage::Error(error.to_string()));
-        }
-    }
 }
 
 fn publish_output(rx: mpsc::Receiver<(u64, u8, KeyEvent)>) {
@@ -160,16 +148,7 @@ pub fn broke(
     publisher.bind(&format!("ipc:///tmp/zmq_robodrummer_{}", args.port))?;
 
     // set up midi input connection
-    let rx = midier::setup_midi_receiver(args.channel, args.key_in, args.device);
-
-    send_if_error(tui_sender.as_ref(), &rx);
-
-    let rx = match rx {
-        Ok(r) => r,
-        Err(_) => {
-            return Ok(());
-        }
-    };
+    let rx = midier::setup_midi_receiver(args.channel, args.key_in, args.device)?;
 
     // start the output midi sender if needed
     if let Some(channel) = args.output_publish {
@@ -183,18 +162,9 @@ pub fn broke(
         thread::spawn(move || publish_output(rx2));
     }
 
-    let res = match args.mode {
-        super::BrokerMode::Single => chord(rx, publisher, 1, tui_sender.clone()),
-        super::BrokerMode::Chord => chord(rx, publisher, args.chord_size, tui_sender.clone()),
-    };
-
-    if let Err(e) = res {
-        if tui_sender.is_some() {
-            // some unwanted error occurred, notify TUI
-            tui_sender
-                .unwrap()
-                .send(MidiTuiMessage::Error(e.to_string()))?;
-        }
+    match args.mode {
+        super::BrokerMode::Single => chord(rx, publisher, 1, tui_sender.clone())?,
+        super::BrokerMode::Chord => chord(rx, publisher, args.chord_size, tui_sender.clone())?,
     }
 
     // gracefully close the thread

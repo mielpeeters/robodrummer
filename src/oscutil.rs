@@ -1,5 +1,8 @@
 use rosc::{encoder, OscError, OscMessage, OscPacket, OscType};
-use std::net::{SocketAddr, UdpSocket};
+use std::{
+    error::Error,
+    net::{SocketAddr, UdpSocket},
+};
 
 pub fn decode(buf: &[u8]) -> Result<(String, Vec<OscType>), OscError> {
     let (_, packet) = rosc::decoder::decode_udp(buf).unwrap();
@@ -16,9 +19,10 @@ pub fn encode(addr: &str, args: Vec<OscType>) -> Vec<u8> {
     }))
     .unwrap()
 }
-pub fn create_socket(port: u16) -> UdpSocket {
+pub fn create_socket(port: u16) -> Result<UdpSocket, Box<dyn Error>> {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    UdpSocket::bind(addr).unwrap()
+    let res = UdpSocket::bind(addr)?;
+    Ok(res)
 }
 
 pub fn send_osc_msg(addr: &str, msg: Vec<rosc::OscType>, socket: &UdpSocket) {

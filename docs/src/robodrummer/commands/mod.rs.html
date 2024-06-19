@@ -968,7 +968,7 @@
 
         <span class="doccomment">/// The device to listen on
         </span><span class="attr">#[arg(long)]
-        </span><span class="kw">pub </span>device: <span class="prelude-ty">Option</span>&lt;String&gt;,
+        </span><span class="kw">pub </span>device: <span class="prelude-ty">Option</span>&lt;u8&gt;,
 
         <span class="doccomment">/// Whether or not to output the midi messages of some channel
         </span><span class="attr">#[arg(long)]
@@ -1034,7 +1034,7 @@
 
     <span class="doccomment">/// The MIDI device (if not given, is interactively asked)
     </span><span class="attr">#[arg(long)]
-    </span><span class="kw">pub </span>device: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    </span><span class="kw">pub </span>device: <span class="prelude-ty">Option</span>&lt;u8&gt;,
 
     <span class="doccomment">/// The midi output note number
     </span><span class="attr">#[arg(long, default_value_t = <span class="number">60</span>)]
