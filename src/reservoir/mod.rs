@@ -1,3 +1,8 @@
+/*!
+* ESN implementation specifically for this project.
+* Includes functionality to import pre-trained pytorch models using npy files.
+*/
+
 use std::{fmt::Display, fs, path::PathBuf, time::Instant};
 
 use make_csv::{csv_entry, csv_start, python};
