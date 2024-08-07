@@ -14,5 +14,5 @@ The GIF above shows example usage of the Terminal User Interface.
 # Documentation
 All documentation can be found [here].
 
-[here]: https://github.ugent.be/pages/RoboDrummer/robodrummer/robodrummer/
+[here]: https://mielpeeters.github.io/robodrummer/robodrummer/
 
