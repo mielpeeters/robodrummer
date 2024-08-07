@@ -5,7 +5,7 @@ This repository contains all code for the single cli binary
 with multiple subcommands that together implement the robotic drummer
 </p>
 
-![out](https://github.ugent.be/storage/user/13081/files/3187bc75-d8a4-4150-a93a-3a876b583ea5)
+![3187bc75-d8a4-4150-a93a-3a876b583ea5](https://github.com/user-attachments/assets/6a0256a4-de77-4100-9c69-124312cafd9c)
 
 # Usage
 The usage is explained in more detail in the documentation.
